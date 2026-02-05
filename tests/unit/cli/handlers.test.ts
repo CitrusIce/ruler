@@ -49,6 +49,7 @@ describe('CLI Handlers', () => {
         'local-only': false,
         nested: false,
         backup: true,
+        'output-scope': 'project' as const,
       };
 
       await applyHandler(argv);
@@ -64,7 +65,9 @@ describe('CLI Handlers', () => {
         false,
         false,
         false,
-        true, undefined,
+        true,
+        undefined,
+        'project',
       );
     });
 
@@ -78,6 +81,7 @@ describe('CLI Handlers', () => {
         'local-only': false,
         nested: false,
         backup: true,
+        'output-scope': 'project' as const,
       };
 
       await applyHandler(argv);
@@ -93,7 +97,9 @@ describe('CLI Handlers', () => {
         false,
         false,
         false,
-        true, undefined,
+        true,
+        undefined,
+        'project',
       );
     });
 
@@ -108,6 +114,7 @@ describe('CLI Handlers', () => {
         'local-only': false,
         nested: false,
         backup: true,
+        'output-scope': 'project' as const,
       };
 
       await applyHandler(argv);
@@ -123,7 +130,9 @@ describe('CLI Handlers', () => {
         false,
         false,
         false,
-        true, undefined,
+        true,
+        undefined,
+        'project',
       );
     });
 
@@ -137,6 +146,7 @@ describe('CLI Handlers', () => {
         'local-only': false,
         nested: false,
         backup: true,
+        'output-scope': 'project' as const,
       };
 
       await applyHandler(argv);
@@ -152,7 +162,9 @@ describe('CLI Handlers', () => {
         false,
         false,
         false,
-        true, undefined,
+        true,
+        undefined,
+        'project',
       );
     });
 
@@ -166,6 +178,7 @@ describe('CLI Handlers', () => {
         'local-only': false,
         nested: true,
         backup: true,
+        'output-scope': 'project' as const,
       };
 
       await applyHandler(argv);
@@ -181,7 +194,9 @@ describe('CLI Handlers', () => {
         false,
         false,
         true, // nested should be true from CLI
-        true, undefined,
+        true,
+        undefined,
+        'project',
       );
       // loadConfig should not be called when CLI explicitly sets nested
       expect(loadConfig).not.toHaveBeenCalled();
@@ -206,6 +221,7 @@ describe('CLI Handlers', () => {
         'local-only': false,
         // nested is undefined (not provided by CLI)
         backup: true,
+        'output-scope': 'project' as const,
       };
 
       await applyHandler(argv);
@@ -225,7 +241,9 @@ describe('CLI Handlers', () => {
         false,
         false,
         true, // nested should be true from TOML
-        true, undefined,
+        true,
+        undefined,
+        'project',
       );
     });
 
@@ -248,6 +266,7 @@ describe('CLI Handlers', () => {
         'local-only': false,
         // nested is undefined (not provided by CLI)
         backup: true,
+        'output-scope': 'project' as const,
       };
 
       await applyHandler(argv);
@@ -263,7 +282,9 @@ describe('CLI Handlers', () => {
         false,
         false,
         false, // nested should default to false
-        true, undefined,
+        true,
+        undefined,
+        'project',
       );
     });
 
@@ -286,6 +307,7 @@ describe('CLI Handlers', () => {
         'local-only': false,
         nested: true, // CLI overrides TOML
         backup: true,
+        'output-scope': 'project' as const,
       };
 
       await applyHandler(argv);
@@ -303,7 +325,9 @@ describe('CLI Handlers', () => {
         false,
         false,
         true, // nested should be true from CLI, ignoring TOML
-        true, undefined,
+        true,
+        undefined,
+        'project',
       );
     });
 
@@ -327,6 +351,7 @@ describe('CLI Handlers', () => {
         'local-only': false,
         nested: false,
         backup: true,
+        'output-scope': 'project' as const,
       };
 
       await expect(applyHandler(argv)).rejects.toThrow('process.exit: 1');
@@ -355,6 +380,7 @@ describe('CLI Handlers', () => {
         'local-only': false,
         nested: false,
         backup: true,
+        'output-scope': 'project' as const,
       };
 
       await expect(applyHandler(argv)).rejects.toThrow('process.exit: 1');

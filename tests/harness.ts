@@ -49,9 +49,25 @@ export async function teardownTestProject(projectRoot: string): Promise<void> {
  */
 export function runRuler(command: string, projectRoot: string): string {
   const fullCommand = `node dist/cli/index.js ${command} --project-root ${projectRoot}`;
-  return execSync(fullCommand, { 
+  return execSync(fullCommand, {
     stdio: 'pipe',
-    encoding: 'utf8'
+    encoding: 'utf8',
+  });
+}
+
+/**
+ * Executes a Ruler CLI command against a test project with custom environment.
+ */
+export function runRulerWithEnv(
+  command: string,
+  projectRoot: string,
+  env: NodeJS.ProcessEnv,
+): string {
+  const fullCommand = `node dist/cli/index.js ${command} --project-root ${projectRoot}`;
+  return execSync(fullCommand, {
+    stdio: 'pipe',
+    encoding: 'utf8',
+    env: { ...process.env, ...env },
   });
 }
 

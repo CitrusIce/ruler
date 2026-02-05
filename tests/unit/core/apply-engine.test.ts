@@ -478,6 +478,7 @@ command = "sub-cmd"
         false,
         true,
         undefined,
+        'project',
         false,
       );
 
@@ -568,6 +569,7 @@ command = "sub-cmd"
         false,
         true,
         undefined,
+        'project',
         false,
       );
 
@@ -732,6 +734,7 @@ command = "sub-cmd"
         false,
         true,
         undefined,
+        'project',
         false,
       );
 
@@ -783,6 +786,7 @@ command = "sub-cmd"
         false,
         true,
         undefined,
+        'project',
         false,
       );
 
@@ -825,6 +829,7 @@ command = "sub-cmd"
         false,
         true,
         undefined,
+        'project',
         false,
       );
 
@@ -866,6 +871,7 @@ command = "sub-cmd"
         false,
         true,
         undefined,
+        'project',
         false,
       );
 
