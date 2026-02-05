@@ -1,5 +1,6 @@
 import * as path from 'path';
 import { promises as fs } from 'fs';
+import * as os from 'os';
 import { parse as parseTOML, stringify } from '@iarna/toml';
 import * as FileSystemUtils from './FileSystemUtils';
 import { concatenateRules } from './RuleProcessor';
@@ -19,7 +20,7 @@ import {
   logInfo,
   logWarn,
 } from '../constants';
-import { McpStrategy } from '../types';
+import { McpStrategy, OutputScope } from '../types';
 
 /**
  * Configuration data loaded from the ruler setup
@@ -328,6 +329,7 @@ export async function processHierarchicalConfigurations(
   dryRun: boolean,
   cliMcpEnabled: boolean,
   cliMcpStrategy?: McpStrategy,
+  outputScope: OutputScope = 'project',
   backup = true,
 ): Promise<string[]> {
   const allGeneratedPaths: string[] = [];
@@ -349,6 +351,7 @@ export async function processHierarchicalConfigurations(
       dryRun,
       cliMcpEnabled,
       cliMcpStrategy,
+      outputScope,
       backup,
     );
     const normalizedPaths = paths.map((p) =>
@@ -380,6 +383,7 @@ export async function processSingleConfiguration(
   dryRun: boolean,
   cliMcpEnabled: boolean,
   cliMcpStrategy?: McpStrategy,
+  outputScope: OutputScope = 'project',
   backup = true,
 ): Promise<string[]> {
   return await applyConfigurationsToAgents(
@@ -392,6 +396,7 @@ export async function processSingleConfiguration(
     dryRun,
     cliMcpEnabled,
     cliMcpStrategy,
+    outputScope,
     backup,
   );
 }
@@ -417,10 +422,15 @@ export async function applyConfigurationsToAgents(
   dryRun: boolean,
   cliMcpEnabled = true,
   cliMcpStrategy?: McpStrategy,
+  outputScope: OutputScope = 'project',
   backup = true,
 ): Promise<string[]> {
   const generatedPaths: string[] = [];
   let agentsMdWritten = false;
+
+  const writeProjectOutputs =
+    outputScope === 'project' || outputScope === 'both';
+  const writeUserOutputs = outputScope === 'user' || outputScope === 'both';
 
   for (const agent of agents) {
     logInfo(`Applying rules for ${agent.getName()}...`, dryRun);
@@ -428,23 +438,29 @@ export async function applyConfigurationsToAgents(
     const agentConfig = config.agentConfigs[agent.getIdentifier()];
     const agentRulerMcpJson = rulerMcpJson;
 
-    // Collect output paths for .gitignore
-    const outputPaths = getAgentOutputPaths(agent, projectRoot, agentConfig);
-    logVerbose(
-      `Agent ${agent.getName()} output paths: ${outputPaths.join(', ')}`,
-      verbose,
-    );
-    generatedPaths.push(...outputPaths);
+    // Collect output paths for .gitignore only when writing to the project.
+    const outputPaths = writeProjectOutputs
+      ? getAgentOutputPaths(agent, projectRoot, agentConfig)
+      : [];
+    if (writeProjectOutputs) {
+      logVerbose(
+        `Agent ${agent.getName()} output paths: ${outputPaths.join(', ')}`,
+        verbose,
+      );
+      generatedPaths.push(...outputPaths);
 
-    // Only add the backup file paths to the gitignore list if backups are enabled
-    if (backup) {
-      const backupPaths = outputPaths.map((p) => `${p}.bak`);
-      generatedPaths.push(...backupPaths);
+      // Only add the backup file paths to the gitignore list if backups are enabled
+      if (backup) {
+        const backupPaths = outputPaths.map((p) => `${p}.bak`);
+        generatedPaths.push(...backupPaths);
+      }
     }
 
     if (dryRun) {
       logVerbose(
-        `DRY RUN: Would write rules to: ${outputPaths.join(', ')}`,
+        writeProjectOutputs
+          ? `DRY RUN: Would write rules to: ${outputPaths.join(', ')}`
+          : `DRY RUN: Skipping project rule files due to output scope: ${outputScope}`,
         verbose,
       );
     } else {
@@ -477,12 +493,24 @@ export async function applyConfigurationsToAgents(
         };
       }
 
-      if (!skipApplyForThisAgent) {
+      if (!skipApplyForThisAgent && writeProjectOutputs) {
         await agent.applyRulerConfig(
           concatenatedRules,
           projectRoot,
           agentRulerMcpJson,
           finalAgentConfig,
+          backup,
+        );
+      }
+
+      // Optional user-scope rules for Claude Code.
+      if (writeUserOutputs && agent.getIdentifier() === 'claude') {
+        const userClaudeMd = path.join(os.homedir(), '.claude', 'CLAUDE.md');
+        await agent.applyRulerConfig(
+          concatenatedRules,
+          projectRoot,
+          null,
+          { ...finalAgentConfig, outputPath: userClaudeMd },
           backup,
         );
       }
@@ -500,6 +528,7 @@ export async function applyConfigurationsToAgents(
       dryRun,
       cliMcpEnabled,
       cliMcpStrategy,
+      outputScope,
       backup,
     );
   }
@@ -518,6 +547,7 @@ async function handleMcpConfiguration(
   dryRun: boolean,
   cliMcpEnabled = true,
   cliMcpStrategy?: McpStrategy,
+  outputScope: OutputScope = 'project',
   backup = true,
 ): Promise<void> {
   if (!agentSupportsMcp(agent)) {
@@ -528,11 +558,20 @@ async function handleMcpConfiguration(
     return;
   }
 
-  const dest = await getNativeMcpPath(agent.getName(), projectRoot);
+  const dests: string[] = [];
+  if (outputScope === 'project' || outputScope === 'both') {
+    const p = await getNativeMcpPath(agent.getName(), projectRoot, 'project');
+    if (p) dests.push(p);
+  }
+  if (outputScope === 'user' || outputScope === 'both') {
+    const p = await getNativeMcpPath(agent.getName(), projectRoot, 'user');
+    if (p) dests.push(p);
+  }
+  const uniqueDests = Array.from(new Set(dests));
   const mcpEnabledForAgent =
     cliMcpEnabled && (agentConfig?.mcp?.enabled ?? config.mcp?.enabled ?? true);
 
-  if (!dest || !mcpEnabledForAgent) {
+  if (uniqueDests.length === 0 || !mcpEnabledForAgent) {
     return;
   }
 
@@ -548,19 +587,22 @@ async function handleMcpConfiguration(
     return;
   }
 
-  await updateGitignoreForMcpFile(dest, projectRoot, generatedPaths, backup);
-  await applyMcpConfiguration(
-    agent,
-    filteredMcpJson,
-    dest,
-    agentConfig,
-    config,
-    projectRoot,
-    cliMcpStrategy,
-    dryRun,
-    verbose,
-    backup,
-  );
+  for (const dest of uniqueDests) {
+    await updateGitignoreForMcpFile(dest, projectRoot, generatedPaths, backup);
+    await applyMcpConfiguration(
+      agent,
+      filteredMcpJson,
+      dest,
+      agentConfig,
+      config,
+      projectRoot,
+      outputScope,
+      cliMcpStrategy,
+      dryRun,
+      verbose,
+      backup,
+    );
+  }
 }
 
 async function updateGitignoreForMcpFile(
@@ -628,15 +670,31 @@ async function applyMcpConfiguration(
   agentConfig: IAgentConfig | undefined,
   config: LoadedConfig,
   projectRoot: string,
+  outputScope: OutputScope,
   cliMcpStrategy: McpStrategy | undefined,
   dryRun: boolean,
   verbose: boolean,
   backup = true,
 ): Promise<void> {
-  // Prevent writing MCP configs outside the project root (e.g., legacy home-directory targets)
-  if (!dest.startsWith(projectRoot)) {
+  const normalizedProjectRoot = path.resolve(projectRoot);
+  const normalizedDest = path.resolve(dest);
+  const isWithin = (child: string, parent: string): boolean => {
+    const rel = path.relative(parent, child);
+    return rel !== '' && !rel.startsWith('..') && !path.isAbsolute(rel);
+  };
+
+  // Safety: only write inside the project root, unless the user explicitly
+  // opted into user-scope outputs.
+  const allowUserWrites = outputScope === 'user' || outputScope === 'both';
+  const homeDir = os.homedir();
+  const isInProject =
+    normalizedDest === normalizedProjectRoot ||
+    isWithin(normalizedDest, normalizedProjectRoot);
+  const isInHome =
+    normalizedDest === homeDir || isWithin(normalizedDest, homeDir);
+  if (!isInProject && !(allowUserWrites && isInHome)) {
     logVerbose(
-      `Skipping MCP config for ${agent.getName()} because target path is outside project: ${dest}`,
+      `Skipping MCP config for ${agent.getName()} because target path is outside allowed roots: ${dest}`,
       verbose,
     );
     return;

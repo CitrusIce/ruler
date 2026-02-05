@@ -77,6 +77,13 @@ export function run(): void {
             type: 'boolean',
             description:
               'Enable/disable skills support (experimental, default: enabled)',
+          })
+          .option('output-scope', {
+            type: 'string',
+            description:
+              'Where to write generated MCP/skills outputs: project (default), user, or both',
+            choices: ['project', 'user', 'both'],
+            default: 'project',
           });
       },
       applyHandler,

@@ -3,6 +3,9 @@
  */
 export type McpStrategy = 'merge' | 'overwrite';
 
+/** Where generated outputs should be written. */
+export type OutputScope = 'project' | 'user' | 'both';
+
 /** MCP configuration for an agent or global. */
 export interface McpConfig {
   /** Enable or disable MCP propagation (merge or overwrite). */

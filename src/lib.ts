@@ -1,7 +1,7 @@
 import * as path from 'path';
 import { IAgent, IAgentConfig } from './agents/IAgent';
 import { allAgents } from './agents';
-import { McpStrategy } from './types';
+import { McpStrategy, OutputScope } from './types';
 import { logVerbose, logWarn } from './constants';
 import {
   loadSingleConfiguration,
@@ -55,6 +55,7 @@ export async function applyAllAgentConfigs(
   nested = false,
   backup = true,
   skillsEnabled?: boolean,
+  outputScope: OutputScope = 'project',
 ): Promise<void> {
   // Load configuration and rules
   logVerbose(
@@ -134,6 +135,7 @@ export async function applyAllAgentConfigs(
           skillsEnabledResolved,
           verbose,
           dryRun,
+          outputScope,
         );
       }
     }
@@ -145,6 +147,7 @@ export async function applyAllAgentConfigs(
       dryRun,
       cliMcpEnabled,
       cliMcpStrategy,
+      outputScope,
       backup,
     );
   } else {
@@ -187,6 +190,7 @@ export async function applyAllAgentConfigs(
         skillsEnabledResolved,
         verbose,
         dryRun,
+        outputScope,
       );
     }
 
@@ -198,6 +202,7 @@ export async function applyAllAgentConfigs(
       dryRun,
       cliMcpEnabled,
       cliMcpStrategy,
+      outputScope,
       backup,
     );
   }
@@ -211,7 +216,7 @@ export async function applyAllAgentConfigs(
   if (skillsEnabledForGitignore) {
     // Skills enabled by default or explicitly
     const { getSkillsGitignorePaths } = await import('./core/SkillsProcessor');
-    const skillsPaths = await getSkillsGitignorePaths(projectRoot);
+    const skillsPaths = await getSkillsGitignorePaths(projectRoot, outputScope);
     allGeneratedPaths = [...generatedPaths, ...skillsPaths];
   }
 

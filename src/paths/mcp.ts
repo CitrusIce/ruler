@@ -1,10 +1,18 @@
 import * as path from 'path';
 import { promises as fs } from 'fs';
+import * as os from 'os';
+
+export type NativeMcpScope = 'project' | 'user';
+
+function getXdgConfigDir(): string {
+  return process.env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config');
+}
 
 /** Determine the native MCP config path for a given agent. */
 export async function getNativeMcpPath(
   adapterName: string,
   projectRoot: string,
+  scope: NativeMcpScope = 'project',
 ): Promise<string | null> {
   const candidates: string[] = [];
   switch (adapterName) {
@@ -22,10 +30,18 @@ export async function getNativeMcpPath(
       candidates.push(path.join(projectRoot, '.windsurf', 'mcp_config.json'));
       break;
     case 'Claude Code':
-      candidates.push(path.join(projectRoot, '.mcp.json'));
+      if (scope === 'user') {
+        candidates.push(path.join(os.homedir(), '.claude.json'));
+      } else {
+        candidates.push(path.join(projectRoot, '.mcp.json'));
+      }
       break;
     case 'OpenAI Codex CLI':
-      candidates.push(path.join(projectRoot, '.codex', 'config.toml'));
+      if (scope === 'user') {
+        candidates.push(path.join(os.homedir(), '.codex', 'config.toml'));
+      } else {
+        candidates.push(path.join(projectRoot, '.codex', 'config.toml'));
+      }
       break;
     case 'Aider':
       candidates.push(path.join(projectRoot, '.mcp.json'));
@@ -47,7 +63,13 @@ export async function getNativeMcpPath(
       candidates.push(path.join(projectRoot, '.kiro', 'settings', 'mcp.json'));
       break;
     case 'OpenCode':
-      candidates.push(path.join(projectRoot, 'opencode.json'));
+      if (scope === 'user') {
+        candidates.push(
+          path.join(getXdgConfigDir(), 'opencode', 'opencode.json'),
+        );
+      } else {
+        candidates.push(path.join(projectRoot, 'opencode.json'));
+      }
       break;
     case 'Firebase Studio':
       candidates.push(path.join(projectRoot, '.idx', 'mcp.json'));

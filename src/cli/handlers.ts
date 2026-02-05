@@ -4,7 +4,7 @@ import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs/promises';
 import { ERROR_PREFIX, DEFAULT_RULES_FILENAME } from '../constants';
-import { McpStrategy } from '../types';
+import { McpStrategy, OutputScope } from '../types';
 import { loadConfig } from '../core/ConfigLoader';
 
 export interface ApplyArgs {
@@ -20,6 +20,7 @@ export interface ApplyArgs {
   nested?: boolean;
   backup: boolean;
   skills?: boolean;
+  'output-scope': OutputScope;
 }
 
 export interface InitArgs {
@@ -66,6 +67,7 @@ export async function applyHandler(argv: ApplyArgs): Promise<void> {
   const dryRun = argv['dry-run'];
   const localOnly = argv['local-only'];
   const backup = argv.backup;
+  const outputScope = argv['output-scope'] ?? 'project';
 
   // Determine gitignore preference: CLI > TOML > Default (enabled)
   // yargs handles --no-gitignore by setting gitignore to false
@@ -97,6 +99,12 @@ export async function applyHandler(argv: ApplyArgs): Promise<void> {
     }
   }
 
+  if (nested && outputScope !== 'project') {
+    throw new Error(
+      'User-scope outputs are not supported with --nested yet (ambiguous precedence). Run without --nested or use --output-scope project.',
+    );
+  }
+
   // Determine skills preference: CLI > TOML > Default (enabled)
   let skillsEnabled: boolean | undefined;
   if (argv.skills !== undefined) {
@@ -119,6 +127,7 @@ export async function applyHandler(argv: ApplyArgs): Promise<void> {
       nested,
       backup,
       skillsEnabled,
+      outputScope,
     );
     console.log('Ruler apply completed successfully.');
   } catch (err: unknown) {

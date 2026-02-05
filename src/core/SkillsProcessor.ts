@@ -1,6 +1,7 @@
 import * as path from 'path';
 import * as fs from 'fs/promises';
-import { SkillInfo } from '../types';
+import * as os from 'os';
+import { OutputScope, SkillInfo } from '../types';
 import {
   RULER_SKILLS_PATH,
   CLAUDE_SKILLS_PATH,
@@ -19,6 +20,32 @@ import {
 } from '../constants';
 import { walkSkillsTree, copySkillsDirectory } from './SkillsUtils';
 import type { IAgent } from '../agents/IAgent';
+
+function getXdgConfigDir(): string {
+  return process.env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config');
+}
+
+async function atomicReplaceDirectory(
+  srcDir: string,
+  destDir: string,
+): Promise<void> {
+  const parentDir = path.dirname(destDir);
+  await fs.mkdir(parentDir, { recursive: true });
+  const tempDir = path.join(parentDir, `skills.tmp-${Date.now()}`);
+  try {
+    await copySkillsDirectory(srcDir, tempDir);
+    await fs.rm(destDir, { recursive: true, force: true });
+    await fs.rename(tempDir, destDir);
+  } catch (err) {
+    // Best-effort cleanup of temp dir.
+    try {
+      await fs.rm(tempDir, { recursive: true, force: true });
+    } catch {
+      // ignore
+    }
+    throw err;
+  }
+}
 
 /**
  * Discovers skills in the project's .ruler/skills directory.
@@ -47,7 +74,13 @@ export async function discoverSkills(
  */
 export async function getSkillsGitignorePaths(
   projectRoot: string,
+  outputScope: OutputScope = 'project',
 ): Promise<string[]> {
+  if (outputScope === 'user') {
+    // User-scope skills are never written into the project, so there's nothing
+    // to add to the project's .gitignore.
+    return [];
+  }
   const skillsDir = path.join(projectRoot, RULER_SKILLS_PATH);
 
   // Check if skills directory exists
@@ -372,6 +405,7 @@ export async function propagateSkills(
   skillsEnabled: boolean,
   verbose: boolean,
   dryRun: boolean,
+  outputScope: OutputScope = 'project',
 ): Promise<void> {
   if (!skillsEnabled) {
     logVerboseInfo(
@@ -440,8 +474,11 @@ export async function propagateSkills(
   // Warn about experimental features
   warnOnceExperimental(verbose, dryRun);
 
-  // Copy to Claude skills directory if needed
-  if (hasNativeSkillsAgent) {
+  const writeProject = outputScope === 'project' || outputScope === 'both';
+  const writeUser = outputScope === 'user' || outputScope === 'both';
+
+  // Copy to project-local skills directories.
+  if (hasNativeSkillsAgent && writeProject) {
     logVerboseInfo(
       `Copying skills to ${CLAUDE_SKILLS_PATH} for Claude Code, GitHub Copilot, and Kilo Code`,
       verbose,
@@ -518,6 +555,38 @@ export async function propagateSkills(
       dryRun,
     );
     await propagateSkillsForAntigravity(projectRoot, { dryRun });
+  }
+
+  // Copy to user-level skills locations (only for supported agents).
+  if (hasNativeSkillsAgent && writeUser) {
+    const userClaudeSkills = path.join(os.homedir(), '.claude', 'skills');
+    const userCodexSkills = path.join(os.homedir(), '.agents', 'skills');
+    const userOpenCodeSkills = path.join(
+      getXdgConfigDir(),
+      'opencode',
+      'skills',
+    );
+
+    if (dryRun) {
+      logVerboseInfo(
+        `DRY RUN: Would copy skills to user directories: ${userClaudeSkills}, ${userCodexSkills}, ${userOpenCodeSkills}`,
+        verbose,
+        dryRun,
+      );
+      return;
+    }
+
+    try {
+      await atomicReplaceDirectory(skillsDir, userClaudeSkills);
+      await atomicReplaceDirectory(skillsDir, userCodexSkills);
+      await atomicReplaceDirectory(skillsDir, userOpenCodeSkills);
+    } catch (err) {
+      logWarn(
+        `Failed to propagate skills to user directories: ${(err as Error).message}`,
+        dryRun,
+      );
+      throw err;
+    }
   }
 
   // No MCP-based propagation; only native skills are supported.
