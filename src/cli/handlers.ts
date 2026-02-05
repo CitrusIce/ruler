@@ -6,6 +6,7 @@ import * as fs from 'fs/promises';
 import { ERROR_PREFIX, DEFAULT_RULES_FILENAME } from '../constants';
 import { McpStrategy, OutputScope } from '../types';
 import { loadConfig } from '../core/ConfigLoader';
+import { importToRuler } from '../import';
 
 export interface ApplyArgs {
   'project-root': string;
@@ -36,6 +37,11 @@ export interface RevertArgs {
   verbose: boolean;
   'dry-run': boolean;
   'local-only': boolean;
+}
+
+export interface ImportArgs {
+  'project-root': string;
+  agents?: string;
 }
 
 function assertNotInsideRulerDir(projectRoot: string): void {
@@ -133,6 +139,31 @@ export async function applyHandler(argv: ApplyArgs): Promise<void> {
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
     console.error(`${ERROR_PREFIX} ${message}`);
+    process.exit(1);
+  }
+}
+
+export async function importHandler(argv: ImportArgs): Promise<void> {
+  try {
+    const projectRoot = argv['project-root'];
+    const agents = argv.agents
+      ? argv.agents
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : undefined;
+
+    // Only support the requested set for reverse generation.
+    const allowed = new Set(['claude', 'codex', 'opencode']);
+    const filtered = agents?.filter((a) => allowed.has(a)) as
+      | ('claude' | 'codex' | 'opencode')[]
+      | undefined;
+
+    await importToRuler({ projectRoot, agents: filtered });
+    console.log('Ruler import completed successfully.');
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`${ERROR_PREFIX} ${msg}`);
     process.exit(1);
   }
 }

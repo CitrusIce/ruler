@@ -1,7 +1,12 @@
 import yargs, { Argv } from 'yargs';
 import { hideBin } from 'yargs/helpers';
-import { applyHandler, initHandler, revertHandler } from './handlers';
-import { ApplyArgs, InitArgs, RevertArgs } from './handlers';
+import {
+  applyHandler,
+  importHandler,
+  initHandler,
+  revertHandler,
+} from './handlers';
+import { ApplyArgs, ImportArgs, InitArgs, RevertArgs } from './handlers';
 import { getAgentIdentifiersForCliHelp } from '../agents/index';
 
 /**
@@ -106,6 +111,24 @@ export function run(): void {
           });
       },
       initHandler,
+    )
+    .command<ImportArgs>(
+      'import',
+      'Import existing agent MCP/skills/rules into a new .ruler directory',
+      (y: Argv) => {
+        return y
+          .option('project-root', {
+            type: 'string',
+            description: 'Project root directory',
+            default: process.cwd(),
+          })
+          .option('agents', {
+            type: 'string',
+            description:
+              'Comma-separated list of agent identifiers to import (claude,codex,opencode). Default: all three.',
+          });
+      },
+      importHandler,
     )
     .command<RevertArgs>(
       'revert',

@@ -308,6 +308,18 @@ ruler apply --verbose
 ruler apply --no-mcp --no-gitignore
 ```
 
+## Usage: The `import` Command
+
+The `import` command reverse-generates a new `.ruler/` directory from existing agent configuration on disk.
+
+Notes:
+- Supports importing MCP + skills + rules for: Claude Code (`claude`), OpenAI Codex CLI (`codex`), and OpenCode (`opencode`).
+- Refuses to run if `.ruler/` already exists in the project.
+
+```bash
+ruler import --agents claude,codex,opencode
+```
+
 ## Usage: The `revert` Command
 
 The `revert` command safely undoes all changes made by `ruler apply`, restoring your project to its pre-ruler state. It intelligently restores files from backups (`.bak` files) when available, or removes generated files that didn't exist before.

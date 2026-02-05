@@ -19,6 +19,8 @@ const agents: IAgent[] = allAgents;
 
 export { allAgents };
 
+export { importToRuler } from './import';
+
 /**
  * Resolves skills enabled state based on precedence: CLI flag > ruler.toml > default (enabled)
  */
