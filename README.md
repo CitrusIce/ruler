@@ -243,6 +243,7 @@ The `apply` command looks for `.ruler/` in the current directory tree, reading t
 | `--backup`                     | Toggle creation of `.bak` backup files (default: enabled).             |
 | `--dry-run`                    | Preview changes without writing files.                                 |
 | `--local-only`                 | Skip `$XDG_CONFIG_HOME` when looking for configuration.                |
+| `--output-scope`               | Where to write MCP/skills outputs: `project` (default), `user`, `both`. |
 | `--verbose` / `-v`             | Display detailed output during execution.                              |
 
 ### Common Examples
@@ -257,6 +258,12 @@ ruler apply
 
 ```bash
 ruler apply --agents copilot,claude
+```
+
+**Write MCP config to user-level locations (no project files):**
+
+```bash
+ruler apply --agents claude,codex,opencode --output-scope user
 ```
 
 **Apply rules only to Firebase Studio:**
@@ -553,7 +560,9 @@ Authorization = "Bearer token"
 
 Ruler uses this configuration with the `merge` (default) or `overwrite` strategy, controlled by `ruler.toml` or CLI flags.
 
-**Home Directory Safety:** Ruler never writes MCP configuration files outside your project root. Any historical references to user home directories (e.g. `~/.codeium/windsurf/mcp_config.json` or `~/.zed/settings.json`) have been removed; only project-local paths are targeted.
+**Home Directory Safety (default):** By default, Ruler only writes generated MCP configuration files inside your project root.
+
+If you explicitly opt in with `--output-scope user` or `--output-scope both`, Ruler will also write MCP configs to the supported user-level locations (e.g. Claude Code `~/.claude.json`, Codex `~/.codex/config.toml`, OpenCode `~/.config/opencode/opencode.json`).
 
 **Note for OpenAI Codex CLI:** To apply the local Codex CLI MCP configuration, set the `CODEX_HOME` environment variable to your project’s `.codex` directory:
 
