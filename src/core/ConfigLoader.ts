@@ -8,6 +8,9 @@ import {
   GlobalMcpConfig,
   GitignoreConfig,
   SkillsConfig,
+  ModelsConfig,
+  CodexModelProviderConfig,
+  OpenCodeProviderConfig,
 } from '../types';
 import { createRulerError } from '../constants';
 
@@ -49,6 +52,60 @@ const rulerConfigSchema = z.object({
   skills: z
     .object({
       enabled: z.boolean().optional(),
+    })
+    .optional(),
+  models: z
+    .object({
+      claude: z
+        .object({
+          model: z.string().optional(),
+          base_url: z.string().optional(),
+          auth_env_key: z
+            .enum(['ANTHROPIC_AUTH_TOKEN', 'ANTHROPIC_API_KEY'])
+            .optional(),
+          auth_value: z.string().optional(),
+        })
+        .optional(),
+      codex: z
+        .object({
+          model_provider: z.string().optional(),
+          model: z.string().optional(),
+          openai_api_key: z.string().optional(),
+          providers: z
+            .record(
+              z.string(),
+              z
+                .object({
+                  name: z.string().optional(),
+                  base_url: z.string().optional(),
+                  wire_api: z.string().optional(),
+                  requires_openai_auth: z.boolean().optional(),
+                })
+                .optional(),
+            )
+            .optional(),
+        })
+        .optional(),
+      opencode: z
+        .object({
+          model: z.string().optional(),
+          small_model: z.string().optional(),
+          providers: z
+            .record(
+              z.string(),
+              z
+                .object({
+                  npm: z.string().optional(),
+                  name: z.string().optional(),
+                  base_url: z.string().optional(),
+                  api_key: z.string().optional(),
+                  models: z.record(z.string(), z.string()).optional(),
+                })
+                .optional(),
+            )
+            .optional(),
+        })
+        .optional(),
     })
     .optional(),
   nested: z.boolean().optional(),
@@ -104,6 +161,8 @@ export interface LoadedConfig {
   gitignore?: GitignoreConfig;
   /** Skills configuration section. */
   skills?: SkillsConfig;
+  /** Model/provider configuration section. */
+  models?: ModelsConfig;
   /** Whether to enable nested rule loading from nested .ruler directories. */
   nested?: boolean;
   /** Whether the nested option was explicitly provided in the config. */
@@ -260,6 +319,105 @@ export async function loadConfig(
   const nestedDefined = typeof raw.nested === 'boolean';
   const nested = nestedDefined ? (raw.nested as boolean) : false;
 
+  const rawModelsSection =
+    raw.models && typeof raw.models === 'object' && !Array.isArray(raw.models)
+      ? (raw.models as Record<string, unknown>)
+      : {};
+  const modelsConfig: ModelsConfig = {};
+  if (
+    rawModelsSection.claude &&
+    typeof rawModelsSection.claude === 'object' &&
+    !Array.isArray(rawModelsSection.claude)
+  ) {
+    const c = rawModelsSection.claude as Record<string, unknown>;
+    modelsConfig.claude = {
+      model: typeof c.model === 'string' ? c.model : undefined,
+      base_url: typeof c.base_url === 'string' ? c.base_url : undefined,
+      auth_env_key:
+        c.auth_env_key === 'ANTHROPIC_AUTH_TOKEN' ||
+        c.auth_env_key === 'ANTHROPIC_API_KEY'
+          ? c.auth_env_key
+          : undefined,
+      auth_value: typeof c.auth_value === 'string' ? c.auth_value : undefined,
+    };
+  }
+  if (
+    rawModelsSection.codex &&
+    typeof rawModelsSection.codex === 'object' &&
+    !Array.isArray(rawModelsSection.codex)
+  ) {
+    const c = rawModelsSection.codex as Record<string, unknown>;
+    const providersRaw =
+      c.providers &&
+      typeof c.providers === 'object' &&
+      !Array.isArray(c.providers)
+        ? (c.providers as Record<string, unknown>)
+        : {};
+    const providers: Record<string, CodexModelProviderConfig> = {};
+    for (const [name, def] of Object.entries(providersRaw)) {
+      if (!def || typeof def !== 'object' || Array.isArray(def)) continue;
+      const d = def as Record<string, unknown>;
+      providers[name] = {
+        name: typeof d.name === 'string' ? d.name : undefined,
+        base_url: typeof d.base_url === 'string' ? d.base_url : undefined,
+        wire_api: typeof d.wire_api === 'string' ? d.wire_api : undefined,
+        requires_openai_auth:
+          typeof d.requires_openai_auth === 'boolean'
+            ? d.requires_openai_auth
+            : undefined,
+      };
+    }
+    modelsConfig.codex = {
+      model_provider:
+        typeof c.model_provider === 'string' ? c.model_provider : undefined,
+      model: typeof c.model === 'string' ? c.model : undefined,
+      providers: Object.keys(providers).length > 0 ? providers : undefined,
+      openai_api_key:
+        typeof c.openai_api_key === 'string' ? c.openai_api_key : undefined,
+    };
+  }
+  if (
+    rawModelsSection.opencode &&
+    typeof rawModelsSection.opencode === 'object' &&
+    !Array.isArray(rawModelsSection.opencode)
+  ) {
+    const c = rawModelsSection.opencode as Record<string, unknown>;
+    const providersRaw =
+      c.providers &&
+      typeof c.providers === 'object' &&
+      !Array.isArray(c.providers)
+        ? (c.providers as Record<string, unknown>)
+        : {};
+    const providers: Record<string, OpenCodeProviderConfig> = {};
+    for (const [name, def] of Object.entries(providersRaw)) {
+      if (!def || typeof def !== 'object' || Array.isArray(def)) continue;
+      const d = def as Record<string, unknown>;
+      const modelsRaw =
+        d.models && typeof d.models === 'object' && !Array.isArray(d.models)
+          ? (d.models as Record<string, unknown>)
+          : {};
+      const modelMap: Record<string, string> = {};
+      for (const [k, v] of Object.entries(modelsRaw)) {
+        if (typeof v === 'string') modelMap[k] = v;
+      }
+      providers[name] = {
+        npm: typeof d.npm === 'string' ? d.npm : undefined,
+        name: typeof d.name === 'string' ? d.name : undefined,
+        base_url: typeof d.base_url === 'string' ? d.base_url : undefined,
+        api_key: typeof d.api_key === 'string' ? d.api_key : undefined,
+        models: Object.keys(modelMap).length > 0 ? modelMap : undefined,
+      };
+    }
+    modelsConfig.opencode = {
+      model: typeof c.model === 'string' ? c.model : undefined,
+      small_model:
+        typeof c.small_model === 'string' ? c.small_model : undefined,
+      providers: Object.keys(providers).length > 0 ? providers : undefined,
+    };
+  }
+  const models =
+    Object.keys(modelsConfig).length > 0 ? modelsConfig : undefined;
+
   return {
     defaultAgents,
     agentConfigs,
@@ -267,6 +425,7 @@ export async function loadConfig(
     mcp: globalMcpConfig,
     gitignore: gitignoreConfig,
     skills: skillsConfig,
+    models,
     nested,
     nestedDefined,
   };

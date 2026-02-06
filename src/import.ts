@@ -3,6 +3,11 @@ import * as os from 'os';
 import { promises as fs } from 'fs';
 import { parse as parseTOML, stringify as stringifyTOML } from '@iarna/toml';
 import type { McpServerDef } from './core/UnifiedConfigTypes';
+import type {
+  CodexModelProviderConfig,
+  ModelsConfig,
+  OpenCodeProviderConfig,
+} from './types';
 
 type ImportAgent = 'claude' | 'codex' | 'opencode';
 
@@ -327,6 +332,205 @@ async function importRules(
   await fs.writeFile(dest, content ?? '', 'utf8');
 }
 
+function stripJsonc(raw: string): string {
+  return raw
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/(^|\s+)\/\/.*$/gm, '$1')
+    .replace(/,\s*([}\]])/g, '$1');
+}
+
+async function readJsoncIfExists(
+  p: string,
+): Promise<Record<string, unknown> | null> {
+  try {
+    const raw = await fs.readFile(p, 'utf8');
+    try {
+      return JSON.parse(raw) as Record<string, unknown>;
+    } catch {
+      return JSON.parse(stripJsonc(raw)) as Record<string, unknown>;
+    }
+  } catch {
+    return null;
+  }
+}
+
+async function importModels(
+  agents: ImportAgent[],
+  src: ImportSource,
+  rulerDir: string,
+): Promise<ModelsConfig | null> {
+  const models: ModelsConfig = {};
+
+  if (agents.includes('claude')) {
+    const settingsPath = path.join(src.homeDir, '.claude', 'settings.json');
+    const settings = await readJsonIfExists(settingsPath);
+    if (settings) {
+      const env =
+        settings.env &&
+        typeof settings.env === 'object' &&
+        !Array.isArray(settings.env)
+          ? (settings.env as Record<string, unknown>)
+          : {};
+      const baseUrl =
+        typeof env.ANTHROPIC_BASE_URL === 'string'
+          ? (env.ANTHROPIC_BASE_URL as string)
+          : undefined;
+      const token =
+        typeof env.ANTHROPIC_AUTH_TOKEN === 'string'
+          ? (env.ANTHROPIC_AUTH_TOKEN as string)
+          : undefined;
+      const apiKey =
+        typeof env.ANTHROPIC_API_KEY === 'string'
+          ? (env.ANTHROPIC_API_KEY as string)
+          : undefined;
+      const authEnvKey = token
+        ? 'ANTHROPIC_AUTH_TOKEN'
+        : apiKey
+          ? 'ANTHROPIC_API_KEY'
+          : undefined;
+      const authVal = token || apiKey;
+
+      models.claude = {
+        model:
+          typeof settings.model === 'string'
+            ? (settings.model as string)
+            : undefined,
+        base_url: baseUrl,
+        auth_env_key: authEnvKey,
+        // Default: inline secrets into ruler.toml.
+        auth_value: authEnvKey ? authVal : undefined,
+      };
+    }
+  }
+
+  if (agents.includes('codex')) {
+    const authPath = path.join(src.homeDir, '.codex', 'auth.json');
+    const auth = await readJsonIfExists(authPath);
+    const openaiKey =
+      auth && typeof auth.OPENAI_API_KEY === 'string'
+        ? (auth.OPENAI_API_KEY as string)
+        : undefined;
+
+    const projectConfigPath = path.join(
+      src.projectRoot,
+      '.codex',
+      'config.toml',
+    );
+    const userConfigPath = path.join(src.homeDir, '.codex', 'config.toml');
+    const projectToml = await readTomlIfExists(projectConfigPath);
+    const userToml = await readTomlIfExists(userConfigPath);
+    const cfg = projectToml || userToml;
+
+    if (cfg) {
+      const model_provider =
+        typeof cfg.model_provider === 'string'
+          ? (cfg.model_provider as string)
+          : undefined;
+      const model =
+        typeof cfg.model === 'string' ? (cfg.model as string) : undefined;
+
+      const providersRaw =
+        cfg.model_providers &&
+        typeof cfg.model_providers === 'object' &&
+        !Array.isArray(cfg.model_providers)
+          ? (cfg.model_providers as Record<string, unknown>)
+          : {};
+      const providers: Record<string, CodexModelProviderConfig> = {};
+      for (const [name, def] of Object.entries(providersRaw)) {
+        if (!def || typeof def !== 'object' || Array.isArray(def)) continue;
+        const d = def as Record<string, unknown>;
+        providers[name] = {
+          name: typeof d.name === 'string' ? (d.name as string) : undefined,
+          base_url:
+            typeof d.base_url === 'string' ? (d.base_url as string) : undefined,
+          wire_api:
+            typeof d.wire_api === 'string' ? (d.wire_api as string) : undefined,
+          requires_openai_auth:
+            typeof d.requires_openai_auth === 'boolean'
+              ? (d.requires_openai_auth as boolean)
+              : undefined,
+        };
+      }
+
+      models.codex = {
+        model_provider,
+        model,
+        providers: Object.keys(providers).length > 0 ? providers : undefined,
+        // Default: inline secrets into ruler.toml.
+        openai_api_key: openaiKey,
+      };
+    }
+  }
+
+  if (agents.includes('opencode')) {
+    const userPath = path.join(src.xdgConfigHome, 'opencode', 'opencode.jsonc');
+    const userJson = await readJsoncIfExists(userPath);
+    if (userJson) {
+      const providers: Record<string, OpenCodeProviderConfig> = {};
+
+      const provider =
+        userJson.provider &&
+        typeof userJson.provider === 'object' &&
+        !Array.isArray(userJson.provider)
+          ? (userJson.provider as Record<string, unknown>)
+          : {};
+      for (const [provName, provDef] of Object.entries(provider)) {
+        if (!provDef || typeof provDef !== 'object' || Array.isArray(provDef))
+          continue;
+        const d = provDef as Record<string, unknown>;
+        const options =
+          d.options &&
+          typeof d.options === 'object' &&
+          !Array.isArray(d.options)
+            ? (d.options as Record<string, unknown>)
+            : {};
+        const baseURL =
+          typeof options.baseURL === 'string'
+            ? (options.baseURL as string)
+            : undefined;
+        const apiKey =
+          typeof options.apiKey === 'string'
+            ? (options.apiKey as string)
+            : undefined;
+
+        const modelsRaw =
+          d.models && typeof d.models === 'object' && !Array.isArray(d.models)
+            ? (d.models as Record<string, unknown>)
+            : {};
+        const modelMap: Record<string, string> = {};
+        for (const [id, m] of Object.entries(modelsRaw)) {
+          if (!m || typeof m !== 'object' || Array.isArray(m)) continue;
+          const mm = m as Record<string, unknown>;
+          if (typeof mm.name === 'string') modelMap[id] = mm.name;
+        }
+
+        providers[provName] = {
+          npm: typeof d.npm === 'string' ? (d.npm as string) : undefined,
+          name: typeof d.name === 'string' ? (d.name as string) : undefined,
+          base_url: baseURL,
+          // Default: inline secrets into ruler.toml.
+          api_key: apiKey,
+          models: Object.keys(modelMap).length > 0 ? modelMap : undefined,
+        };
+      }
+
+      models.opencode = {
+        model:
+          typeof userJson.model === 'string'
+            ? (userJson.model as string)
+            : undefined,
+        small_model:
+          typeof userJson.small_model === 'string'
+            ? (userJson.small_model as string)
+            : undefined,
+        providers: Object.keys(providers).length > 0 ? providers : undefined,
+      };
+    }
+  }
+
+  return Object.keys(models).length > 0 ? models : null;
+}
+
 export async function importToRuler(options: {
   projectRoot: string;
   agents?: ImportAgent[];
@@ -345,14 +549,21 @@ export async function importToRuler(options: {
 
   await importRules(projectRoot, homeDir, rulerDir);
 
+  const models = await importModels(agents, src, rulerDir);
+
   const servers = await importMcpServers(agents, src);
   const tomlObj: Record<string, unknown> = {
     mcp: {
       enabled: true,
       merge_strategy: 'merge',
     },
+    models: models ?? undefined,
     mcp_servers: servers,
   };
+  // Avoid serializing `models = {}` when no model info was found.
+  if (!models) {
+    delete (tomlObj as Record<string, unknown>).models;
+  }
   const tomlText = stringifyTOML(tomlObj);
   await fs.writeFile(path.join(rulerDir, 'ruler.toml'), tomlText, 'utf8');
 

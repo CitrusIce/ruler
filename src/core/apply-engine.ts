@@ -21,6 +21,11 @@ import {
   logWarn,
 } from '../constants';
 import { McpStrategy, OutputScope } from '../types';
+import {
+  resolvePlaceholderString,
+  getUserClaudeSettingsPath,
+  getUserCodexAuthPath,
+} from './placeholders';
 
 /**
  * Configuration data loaded from the ruler setup
@@ -432,6 +437,11 @@ export async function applyConfigurationsToAgents(
     outputScope === 'project' || outputScope === 'both';
   const writeUserOutputs = outputScope === 'user' || outputScope === 'both';
 
+  // If model config is present, ensure secrets.toml is ignored in projects.
+  if (writeProjectOutputs && config.models) {
+    generatedPaths.push(path.join(projectRoot, '.ruler', 'secrets.toml'));
+  }
+
   for (const agent of agents) {
     logInfo(`Applying rules for ${agent.getName()}...`, dryRun);
     logVerbose(`Processing agent: ${agent.getName()}`, verbose);
@@ -531,9 +541,318 @@ export async function applyConfigurationsToAgents(
       outputScope,
       backup,
     );
+
+    await handleModelConfiguration(
+      agent,
+      config,
+      projectRoot,
+      outputScope,
+      verbose,
+      dryRun,
+      backup,
+    );
   }
 
   return generatedPaths;
+}
+
+async function handleModelConfiguration(
+  agent: IAgent,
+  config: LoadedConfig,
+  projectRoot: string,
+  outputScope: OutputScope,
+  verbose: boolean,
+  dryRun: boolean,
+  backup: boolean,
+): Promise<void> {
+  const models = config.models;
+  if (!models) return;
+
+  const allowUserWrites = outputScope === 'user' || outputScope === 'both';
+  const allowProjectWrites =
+    outputScope === 'project' || outputScope === 'both';
+
+  // Claude Code model settings are user-scoped.
+  if (agent.getIdentifier() === 'claude') {
+    if (!allowUserWrites || !models.claude) return;
+    const settingsPath = getUserClaudeSettingsPath();
+    if (dryRun) {
+      logVerbose(
+        `DRY RUN: Would apply Claude model settings to: ${settingsPath}`,
+        verbose,
+      );
+      return;
+    }
+
+    let existing: Record<string, unknown> = {};
+    try {
+      const raw = await fs.readFile(settingsPath, 'utf8');
+      existing = JSON.parse(raw) as Record<string, unknown>;
+    } catch {
+      existing = {};
+    }
+
+    const next = { ...existing } as Record<string, unknown>;
+    if (models.claude.model) next.model = models.claude.model;
+
+    const env =
+      next.env && typeof next.env === 'object' && !Array.isArray(next.env)
+        ? ({ ...(next.env as Record<string, unknown>) } as Record<
+            string,
+            unknown
+          >)
+        : {};
+    if (models.claude.base_url) {
+      env.ANTHROPIC_BASE_URL = models.claude.base_url;
+    }
+    if (models.claude.auth_env_key && models.claude.auth_value) {
+      const resolved = await resolvePlaceholderString(
+        models.claude.auth_value,
+        projectRoot,
+      );
+      if (resolved) {
+        env[models.claude.auth_env_key] = resolved;
+      } else {
+        logWarn(
+          `Skipping Claude auth token update: could not resolve ${models.claude.auth_value}`,
+          dryRun,
+        );
+      }
+    }
+    if (Object.keys(env).length > 0) next.env = env;
+
+    const currentContent = JSON.stringify(existing, null, 2);
+    const newContent = JSON.stringify(next, null, 2);
+    if (currentContent !== newContent) {
+      if (backup) {
+        const { backupFile } = await import('../core/FileSystemUtils');
+        await backupFile(settingsPath);
+      }
+      await FileSystemUtils.writeGeneratedFile(settingsPath, newContent + '\n');
+    }
+    return;
+  }
+
+  if (agent.getIdentifier() === 'codex') {
+    if (!models.codex) return;
+
+    // model_provider/model can be project- or user-scoped, but Codex auth.json is user-scoped.
+    if (allowProjectWrites) {
+      const configPath = path.join(projectRoot, '.codex', 'config.toml');
+      if (dryRun) {
+        logVerbose(
+          `DRY RUN: Would apply Codex model settings to: ${configPath}`,
+          verbose,
+        );
+      } else {
+        let existingToml: Record<string, unknown> = {};
+        try {
+          const raw = await fs.readFile(configPath, 'utf8');
+          existingToml = parseTOML(raw) as Record<string, unknown>;
+        } catch {
+          existingToml = {};
+        }
+
+        const next = { ...existingToml } as Record<string, unknown>;
+        if (models.codex.model_provider)
+          next.model_provider = models.codex.model_provider;
+        if (models.codex.model) next.model = models.codex.model;
+        if (models.codex.providers) {
+          next.model_providers = {
+            ...(next.model_providers as any),
+            ...models.codex.providers,
+          };
+        }
+
+        const currentContent = stringify(existingToml);
+        const newContent = stringify(next as Record<string, unknown>);
+        if (currentContent !== newContent) {
+          if (backup) {
+            const { backupFile } = await import('../core/FileSystemUtils');
+            await backupFile(configPath);
+          }
+          await FileSystemUtils.writeGeneratedFile(configPath, newContent);
+        }
+      }
+    }
+
+    if (allowUserWrites && models.codex.openai_api_key) {
+      const authPath = getUserCodexAuthPath();
+      if (dryRun) {
+        logVerbose(`DRY RUN: Would apply Codex auth to: ${authPath}`, verbose);
+      } else {
+        const resolved = await resolvePlaceholderString(
+          models.codex.openai_api_key,
+          projectRoot,
+        );
+        if (!resolved) {
+          logWarn(
+            `Skipping Codex OPENAI_API_KEY update: could not resolve ${models.codex.openai_api_key}`,
+            dryRun,
+          );
+          return;
+        }
+        let existingAuth: Record<string, unknown> = {};
+        try {
+          const raw = await fs.readFile(authPath, 'utf8');
+          existingAuth = JSON.parse(raw) as Record<string, unknown>;
+        } catch {
+          existingAuth = {};
+        }
+        const next = { ...existingAuth, OPENAI_API_KEY: resolved };
+        const currentContent = JSON.stringify(existingAuth, null, 2);
+        const newContent = JSON.stringify(next, null, 2);
+        if (currentContent !== newContent) {
+          if (backup) {
+            const { backupFile } = await import('../core/FileSystemUtils');
+            await backupFile(authPath);
+          }
+          await FileSystemUtils.writeGeneratedFile(authPath, newContent + '\n');
+        }
+      }
+    }
+  }
+
+  if (agent.getIdentifier() === 'opencode') {
+    const opencode = models.opencode;
+    if (!opencode) return;
+
+    const applyToJsonFile = async (destPath: string): Promise<void> => {
+      let rawText: string | null = null;
+      let existing: Record<string, unknown> = {};
+      try {
+        rawText = await fs.readFile(destPath, 'utf8');
+      } catch {
+        rawText = null;
+      }
+
+      if (rawText) {
+        try {
+          existing = JSON.parse(rawText) as Record<string, unknown>;
+        } catch {
+          // Lenient JSONC fallback.
+          const stripped = rawText
+            .replace(/\/\*[\s\S]*?\*\//g, '')
+            .replace(/(^|\s+)\/\/.*$/gm, '$1')
+            .replace(/,\s*([}\]])/g, '$1');
+          existing = JSON.parse(stripped) as Record<string, unknown>;
+        }
+      }
+
+      const next = { ...existing } as Record<string, unknown>;
+      if (opencode.model) next.model = opencode.model;
+      if (opencode.small_model) next.small_model = opencode.small_model;
+
+      if (opencode.providers) {
+        const existingProviders =
+          next.provider &&
+          typeof next.provider === 'object' &&
+          !Array.isArray(next.provider)
+            ? ({ ...(next.provider as Record<string, unknown>) } as Record<
+                string,
+                unknown
+              >)
+            : {};
+
+        for (const [provName, provCfg] of Object.entries(opencode.providers)) {
+          const current =
+            existingProviders[provName] &&
+            typeof existingProviders[provName] === 'object' &&
+            !Array.isArray(existingProviders[provName])
+              ? ({
+                  ...(existingProviders[provName] as Record<string, unknown>),
+                } as Record<string, unknown>)
+              : {};
+
+          if (provCfg.npm) current.npm = provCfg.npm;
+          if (provCfg.name) current.name = provCfg.name;
+
+          const options =
+            current.options &&
+            typeof current.options === 'object' &&
+            !Array.isArray(current.options)
+              ? ({ ...(current.options as Record<string, unknown>) } as Record<
+                  string,
+                  unknown
+                >)
+              : {};
+          if (provCfg.base_url) options.baseURL = provCfg.base_url;
+          if (provCfg.api_key) {
+            const resolved = await resolvePlaceholderString(
+              provCfg.api_key,
+              projectRoot,
+            );
+            if (resolved) options.apiKey = resolved;
+            else {
+              logWarn(
+                `Skipping OpenCode provider apiKey update for ${provName}: could not resolve ${provCfg.api_key}`,
+                dryRun,
+              );
+            }
+          }
+          if (Object.keys(options).length > 0) current.options = options;
+
+          if (provCfg.models) {
+            const modelsObj: Record<string, unknown> =
+              current.models &&
+              typeof current.models === 'object' &&
+              !Array.isArray(current.models)
+                ? ({ ...(current.models as Record<string, unknown>) } as Record<
+                    string,
+                    unknown
+                  >)
+                : {};
+            for (const [id, display] of Object.entries(provCfg.models)) {
+              modelsObj[id] = { name: display };
+            }
+            current.models = modelsObj;
+          }
+
+          existingProviders[provName] = current;
+        }
+
+        next.provider = existingProviders;
+      }
+
+      const currentContent = rawText ? rawText : '';
+      const newContent = JSON.stringify(next, null, 2) + '\n';
+      if (currentContent.trim() !== newContent.trim()) {
+        if (backup) {
+          const { backupFile } = await import('../core/FileSystemUtils');
+          await backupFile(destPath);
+        }
+        await FileSystemUtils.writeGeneratedFile(destPath, newContent);
+      }
+    };
+
+    if (allowProjectWrites) {
+      const projectPath = path.join(projectRoot, 'opencode.json');
+      if (dryRun) {
+        logVerbose(
+          `DRY RUN: Would apply OpenCode model settings to: ${projectPath}`,
+          verbose,
+        );
+      } else {
+        await applyToJsonFile(projectPath);
+      }
+    }
+
+    if (allowUserWrites) {
+      const userJsoncPath = path.join(
+        process.env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config'),
+        'opencode',
+        'opencode.jsonc',
+      );
+      if (dryRun) {
+        logVerbose(
+          `DRY RUN: Would apply OpenCode model settings to: ${userJsoncPath}`,
+          verbose,
+        );
+      } else {
+        await applyToJsonFile(userJsoncPath);
+      }
+    }
+  }
 }
 
 async function handleMcpConfiguration(
