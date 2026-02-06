@@ -38,7 +38,9 @@ describe('Revert Core Functions', () => {
       
       await revertAllAgentConfigs(tmpDir, undefined, undefined, false, false, true);
       
-      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('[ruler:dry-run] Revert summary (dry run):'));
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[ruler-plus:dry-run] Revert summary (dry run):'),
+      );
       
       await expect(fs.access(path.join(tmpDir, 'CLAUDE.md'))).resolves.toBeUndefined();
       
@@ -138,7 +140,7 @@ describe('Revert Core Functions', () => {
       jest.clearAllMocks();
     });
 
-    it('should use [ruler:dry-run] prefix consistently when dryRun is true', async () => {
+    it('should use [ruler-plus:dry-run] prefix consistently when dryRun is true', async () => {
       const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
       await fs.writeFile(path.join(tmpDir, 'CLAUDE.md'), 'Generated content');
       
@@ -146,14 +148,14 @@ describe('Revert Core Functions', () => {
       
       const logCalls = consoleLogSpy.mock.calls.flat();
       const hasRulerDryRunPrefix = logCalls.some(call => 
-        typeof call === 'string' && call.includes('[ruler:dry-run]')
+        typeof call === 'string' && call.includes('[ruler-plus:dry-run]')
       );
       
       expect(hasRulerDryRunPrefix).toBe(true);
       consoleLogSpy.mockRestore();
     });
 
-    it('should use [ruler] prefix consistently when dryRun is false', async () => {
+    it('should use [ruler-plus] prefix consistently when dryRun is false', async () => {
       const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
       await fs.writeFile(path.join(tmpDir, 'CLAUDE.md'), 'Generated content');
       
@@ -161,7 +163,7 @@ describe('Revert Core Functions', () => {
       
       const logCalls = consoleLogSpy.mock.calls.flat();
       const hasRulerPrefix = logCalls.some(call => 
-        typeof call === 'string' && call.includes('[ruler]') && !call.includes('[ruler:dry-run]')
+        typeof call === 'string' && call.includes('[ruler-plus]') && !call.includes('[ruler-plus:dry-run]')
       );
       
       expect(hasRulerPrefix).toBe(true);

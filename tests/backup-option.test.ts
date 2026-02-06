@@ -22,7 +22,7 @@ describe('backup option', () => {
     const targetFile = path.join(projectRoot, 'AGENTS.md');
     const backupFile = path.join(projectRoot, 'AGENTS.md.bak');
     
-    runRuler('apply', projectRoot);
+    runRuler('apply agentsmd', projectRoot);
     
     // Check that backup file was created
     const backupExists = await fs.access(backupFile).then(() => true).catch(() => false);
@@ -38,7 +38,7 @@ describe('backup option', () => {
     const targetFile = path.join(projectRoot, 'AGENTS.md');
     const backupFile = path.join(projectRoot, 'AGENTS.md.bak');
     
-    runRuler('apply --backup', projectRoot);
+    runRuler('apply agentsmd --backup', projectRoot);
     
     // Check that backup file was created
     const backupExists = await fs.access(backupFile).then(() => true).catch(() => false);
@@ -54,7 +54,7 @@ describe('backup option', () => {
     const targetFile = path.join(projectRoot, 'AGENTS.md');
     const backupFile = path.join(projectRoot, 'AGENTS.md.bak');
     
-    runRuler('apply --no-backup', projectRoot);
+    runRuler('apply agentsmd --no-backup', projectRoot);
     
     // Check that backup file was NOT created
     const backupExists = await fs.access(backupFile).then(() => true).catch(() => false);
@@ -70,7 +70,7 @@ describe('backup option', () => {
     const { projectRoot } = testProject;
     const gitignoreFile = path.join(projectRoot, '.gitignore');
     
-    runRuler('apply --no-backup', projectRoot);
+    runRuler('apply agentsmd --no-backup', projectRoot);
     
     // Check .gitignore content
     const gitignoreContent = await fs.readFile(gitignoreFile, 'utf8');
@@ -86,7 +86,7 @@ describe('backup option', () => {
     const { projectRoot } = testProject;
     const gitignoreFile = path.join(projectRoot, '.gitignore');
     
-    runRuler('apply --backup', projectRoot);
+    runRuler('apply agentsmd --backup', projectRoot);
     
     // Check .gitignore content
     const gitignoreContent = await fs.readFile(gitignoreFile, 'utf8');
@@ -108,7 +108,7 @@ describe('backup option', () => {
         const { projectRoot } = testProject;
         const backupFile = path.join(projectRoot, 'AGENTS.md.bak');
         
-        runRuler('apply --no-backup', projectRoot);
+        runRuler('apply agentsmd --no-backup', projectRoot);
         
         // Check that backup file was NOT created
         const backupExists = await fs.access(backupFile).then(() => true).catch(() => false);
@@ -137,7 +137,7 @@ describe('backup option', () => {
         // Create existing file to be potentially backed up
         await fs.writeFile(targetFile, '# Existing Windsurf Rules\nShould not be backed up.');
         
-        runRuler('apply --no-backup', projectRoot);
+        runRuler('apply windsurf --no-backup', projectRoot);
         
         // Check that backup file was NOT created
         const backupExists = await fs.access(backupFile).then(() => true).catch(() => false);
@@ -166,7 +166,7 @@ describe('backup option', () => {
         // Create existing file to be potentially backed up
         await fs.writeFile(targetFile, '# Existing Cursor Rules\nShould not be backed up.');
 
-        runRuler('apply --no-backup', projectRoot);
+        runRuler('apply cursor --no-backup', projectRoot);
 
         // Check that backup file was NOT created
         const backupExists = await fs.access(backupFile).then(() => true).catch(() => false);
@@ -196,7 +196,7 @@ describe('backup option', () => {
         await fs.mkdir(path.dirname(targetFile), { recursive: true });
         await fs.writeFile(targetFile, '# Existing AugmentCode Rules\nShould not be backed up.');
         
-        runRuler('apply --no-backup', projectRoot);
+        runRuler('apply augmentcode --no-backup', projectRoot);
         
         // Check that backup file was NOT created
         const backupExists = await fs.access(backupFile).then(() => true).catch(() => false);
@@ -223,7 +223,7 @@ describe('backup option', () => {
         const agentsMdBackupFile = path.join(projectRoot, 'AGENTS.md.bak');
         const aiderConfBackupFile = path.join(projectRoot, '.aider.conf.yml.bak');
         
-        runRuler('apply --no-backup', projectRoot);
+        runRuler('apply aider --no-backup', projectRoot);
         
         // Check that neither backup file was created
         const agentsMdBackupExists = await fs.access(agentsMdBackupFile).then(() => true).catch(() => false);
@@ -265,7 +265,11 @@ describe('backup option', () => {
         await fs.writeFile(augmentFile, 'Existing augment content');
         await fs.writeFile(aiderConfFile, 'read: ["old.md"]');
         
-        runRuler('apply', projectRoot); // Default behavior should create backups
+        runRuler('apply agentsmd', projectRoot);
+        runRuler('apply windsurf', projectRoot);
+        runRuler('apply cursor', projectRoot);
+        runRuler('apply augmentcode', projectRoot);
+        runRuler('apply aider', projectRoot);
         
         // Check that all backup files were created
         // Note: Windsurf and Cursor now use AGENTS.md, so their backup is AGENTS.md.bak

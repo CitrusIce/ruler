@@ -22,7 +22,7 @@ describe('Gemini MCP key usage', () => {
   });
 
   it('writes mcpServers key and contextFileName in .gemini/settings.json', async () => {
-    runRulerWithInheritedStdio('apply --agents gemini-cli', projectRoot);
+    runRulerWithInheritedStdio('apply gemini-cli', projectRoot);
     const settingsPath = path.join(projectRoot, '.gemini', 'settings.json');
     const raw = await fs.readFile(settingsPath, 'utf8');
     const json = JSON.parse(raw);
@@ -32,4 +32,3 @@ describe('Gemini MCP key usage', () => {
     expect(Object.keys(json.mcpServers)).toContain('example');
   });
 });
-

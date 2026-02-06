@@ -1,7 +1,7 @@
 import * as path from 'path';
 import { IAgent, IAgentConfig } from './agents/IAgent';
 import { allAgents } from './agents';
-import { McpStrategy, OutputScope } from './types';
+import { McpStrategy, ModelsConfig, OutputScope } from './types';
 import { logVerbose, logWarn } from './constants';
 import {
   loadSingleConfiguration,
@@ -58,6 +58,7 @@ export async function applyAllAgentConfigs(
   backup = true,
   skillsEnabled?: boolean,
   outputScope: OutputScope = 'project',
+  modelsOverride?: ModelsConfig,
 ): Promise<void> {
   // Load configuration and rules
   logVerbose(
@@ -71,6 +72,24 @@ export async function applyAllAgentConfigs(
   let selectedAgents: IAgent[];
   let generatedPaths: string[];
   let loadedConfig: LoadedConfig;
+
+  const applyModelsOverride = (cfg: LoadedConfig): void => {
+    if (!modelsOverride) return;
+    const merged: ModelsConfig = { ...(cfg.models ?? {}) };
+    if (modelsOverride.claude) {
+      merged.claude = { ...(merged.claude ?? {}), ...modelsOverride.claude };
+    }
+    if (modelsOverride.codex) {
+      merged.codex = { ...(merged.codex ?? {}), ...modelsOverride.codex };
+    }
+    if (modelsOverride.opencode) {
+      merged.opencode = {
+        ...(merged.opencode ?? {}),
+        ...modelsOverride.opencode,
+      };
+    }
+    cfg.models = merged;
+  };
 
   if (nested) {
     const hierarchicalConfigs = await loadNestedConfigurations(
@@ -98,6 +117,8 @@ export async function applyAllAgentConfigs(
     loadedConfig = rootConfig;
     rootConfig.cliAgents = includedAgents;
 
+    applyModelsOverride(rootConfig);
+
     logVerbose(
       `Loaded ${hierarchicalConfigs.length} .ruler directory configurations`,
       verbose,
@@ -109,6 +130,7 @@ export async function applyAllAgentConfigs(
 
     for (const configEntry of hierarchicalConfigs) {
       normalizeAgentConfigs(configEntry.config, agents);
+      applyModelsOverride(configEntry.config);
     }
 
     selectedAgents = resolveSelectedAgents(rootConfig, agents);
@@ -161,6 +183,8 @@ export async function applyAllAgentConfigs(
 
     loadedConfig = singleConfig.config;
     singleConfig.config.cliAgents = includedAgents;
+
+    applyModelsOverride(singleConfig.config);
 
     logVerbose(
       `Loaded configuration with ${Object.keys(singleConfig.config.agentConfigs).length} agent configs`,

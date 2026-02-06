@@ -25,7 +25,7 @@ describe('claude-mcp-config', () => {
   it('should use "mcpServers" key for Claude Code', async () => {
     const { projectRoot } = testProject;
     
-    runRulerWithInheritedStdio('apply --agents claude', projectRoot);
+    runRulerWithInheritedStdio('apply claude', projectRoot);
 
     // Verify Claude MCP config uses 'mcpServers' key
     const claudeResultText = await fs.readFile(
@@ -45,7 +45,7 @@ describe('claude-mcp-config', () => {
   it('should use "mcpServers" key for Claude Code with overwrite strategy', async () => {
     const { projectRoot } = testProject;
     
-    runRulerWithInheritedStdio('apply --agents claude --mcp-overwrite', projectRoot);
+    runRulerWithInheritedStdio('apply claude --mcp-overwrite', projectRoot);
 
     // Verify Claude MCP config was overwritten and uses 'mcpServers' key
     const claudeResultText = await fs.readFile(

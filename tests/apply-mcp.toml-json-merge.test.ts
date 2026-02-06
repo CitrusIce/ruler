@@ -45,7 +45,7 @@ url = "https://toml.example.com"
   it('merges TOML and JSON MCP servers with TOML taking precedence', async () => {
     const { projectRoot } = testProject;
     
-    runRuler('apply --agents copilot', projectRoot);
+    runRuler('apply copilot', projectRoot);
     
     const nativePath = path.join(projectRoot, '.vscode', 'mcp.json');
     const content = await fs.readFile(nativePath, 'utf8');

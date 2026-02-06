@@ -169,7 +169,7 @@ project/
 - Discover all `.ruler/` directories in the project hierarchy
 - Load and concatenate rules from each directory in order
 - Decide whether nested mode is enabled using the following precedence:
-  1. `ruler-plus apply --nested` (or `--no-nested`) takes top priority
+  1. `ruler-plus apply <agent> --nested` (or `--no-nested`) takes top priority
   2. `nested = true` in `ruler.toml`
   3. Default to disabled when neither option is provided
 - When a run is nested, downstream configs are forced to keep `nested = true`. If a child config attempts to disable it, Ruler keeps nested processing active and emits a warning in the logs.
@@ -221,7 +221,7 @@ project/
 ### Primary Command
 
 ```bash
-ruler-plus apply [options]
+ruler-plus apply <agent> [options]
 ```
 
 The `apply` command looks for `.ruler/` in the current directory tree, reading the first match. If no such directory is found, it will look for a global configuration in `$XDG_CONFIG_HOME/ruler`.
@@ -248,64 +248,46 @@ The `apply` command looks for `.ruler/` in the current directory tree, reading t
 
 ### Common Examples
 
-**Apply rules to all configured agents:**
+**Apply configuration to Claude Code:**
 
 ```bash
-ruler-plus apply
+ruler-plus apply claude
 ```
 
-**Apply rules only to GitHub Copilot and Claude:**
+**Apply configuration to Codex CLI:**
 
 ```bash
-ruler-plus apply --agents copilot,claude
+ruler-plus apply codex
 ```
 
 **Write MCP config to user-level locations (no project files):**
 
 ```bash
-ruler-plus apply --agents claude,codex,opencode --output-scope user
+ruler-plus apply claude --output-scope user
 ```
 
-**Apply rules only to Firebase Studio:**
+**Apply configuration to OpenCode:**
 
 ```bash
-ruler-plus apply --agents firebase
-```
-
-**Apply rules only to Warp:**
-
-```bash
-ruler-plus apply --agents warp
-```
-
-**Apply rules only to Trae AI:**
-
-```bash
-ruler-plus apply --agents trae
-```
-
-**Apply rules only to RooCode:**
-
-```bash
-ruler-plus apply --agents roo
+ruler-plus apply opencode
 ```
 
 **Use a specific configuration file:**
 
 ```bash
-ruler-plus apply --config ./team-configs/ruler.frontend.toml
+ruler-plus apply claude --config ./team-configs/ruler.frontend.toml
 ```
 
 **Apply rules with verbose output:**
 
 ```bash
-ruler-plus apply --verbose
+ruler-plus apply claude --verbose
 ```
 
 **Apply rules but skip MCP and .gitignore updates:**
 
 ```bash
-ruler-plus apply --no-mcp --no-gitignore
+ruler-plus apply claude --no-mcp --no-gitignore
 ```
 
 ## Usage: The `import` Command
@@ -586,7 +568,7 @@ export CODEX_HOME="$(pwd)/.codex"
 
 **⚠️ Experimental Feature**: Skills support is currently experimental. Skills are only propagated to agents with native skills support; other agents are skipped with a warning.
 
-Ruler can manage and propagate skills to supported AI agents. Skills are stored in `.ruler/skills/` and are automatically distributed to compatible agents when you run `ruler-plus apply`.
+Ruler can manage and propagate skills to supported AI agents. Skills are stored in `.ruler/skills/` and are automatically distributed to compatible agents when you run `ruler-plus apply <agent>`.
 
 ### How It Works
 
@@ -640,10 +622,10 @@ Skills support is **enabled by default** but can be controlled via:
 
 ```bash
 # Enable skills (default)
-ruler-plus apply --skills
+ruler-plus apply claude --skills
 
 # Disable skills
-ruler-plus apply --no-skills
+ruler-plus apply claude --no-skills
 ```
 
 **Configuration in `ruler.toml`:**
@@ -693,7 +675,7 @@ Warnings don't prevent propagation but help identify potential issues.
 Test skills propagation without making changes:
 
 ```bash
-ruler-plus apply --dry-run
+ruler-plus apply claude --dry-run
 ```
 
 This shows which skills would be copied.
@@ -717,7 +699,7 @@ When working on this project, always follow these guidelines:
 EOF
 
 # 2. Apply to all agents (skills enabled by default)
-ruler-plus apply
+ruler-plus apply claude
 
 # 3. Skills are now available to compatible agents:
 #    - Claude Code, GitHub Copilot & Kilo Code: .claude/skills/my-skill/
@@ -781,7 +763,7 @@ ruler-plus init
 # - Customize .ruler/ruler.toml if needed
 
 # Apply rules to all AI agents
-ruler-plus apply
+ruler-plus apply claude
 ```
 
 ### Scenario 2: Complex Projects with Nested Rules
@@ -805,10 +787,10 @@ nested = true
 
 ```bash
 # The CLI inherits nested mode from ruler.toml
-ruler-plus apply --verbose
+ruler-plus apply claude --verbose
 
 # Override from the CLI at any time
-ruler-plus apply --no-nested
+ruler-plus apply claude --no-nested
 ```
 
 This creates context-specific instructions for different parts of your project while maintaining global rules in the root `.ruler/` directory. Nested runs automatically keep every nested config enabled even if a child tries to disable it.
@@ -820,20 +802,20 @@ This creates context-specific instructions for different parts of your project w
 
 1. Create `.ruler/coding_standards.md`, `.ruler/api_usage.md`
 2. Commit the `.ruler` directory to your repository
-3. Team members pull changes and run `ruler-plus apply` to update their local AI agent configurations
+3. Team members pull changes and run `ruler-plus apply <agent>` to update their local AI agent configurations
 
 ### Scenario 4: Project-Specific Context for AI
 
 1. Detail your project's architecture in `.ruler/project_overview.md`
 2. Describe primary data structures in `.ruler/data_models.md`
-3. Run `ruler-plus apply` to help AI tools provide more relevant suggestions
+3. Run `ruler-plus apply <agent>` to help AI tools provide more relevant suggestions
 
 ### Integration with NPM Scripts
 
 ```json
 {
     "scripts": {
-    "ruler:apply": "ruler-plus apply",
+    "ruler:apply": "ruler-plus apply claude",
     "dev": "npm run ruler:apply && your_dev_command",
     "precommit": "npm run ruler:apply"
   }
@@ -863,13 +845,13 @@ jobs:
         run: npm install -g @intellectronica/ruler
 
       - name: Apply Ruler configuration
-        run: ruler-plus apply --no-gitignore
+        run: ruler-plus apply claude --no-gitignore
 
       - name: Check for uncommitted changes
         run: |
           if [[ -n $(git status --porcelain) ]]; then
             echo "::error::Ruler configuration is out of sync!"
-            echo "Please run 'ruler-plus apply' locally and commit the changes."
+            echo "Please run 'ruler-plus apply <agent>' locally and commit the changes."
             exit 1
           fi
 ```
@@ -903,7 +885,7 @@ jobs:
 Use `--verbose` flag to see detailed execution logs:
 
 ```bash
-ruler-plus apply --verbose
+ruler-plus apply claude --verbose
 ```
 
 This shows:
@@ -919,7 +901,7 @@ This shows:
 A: Currently, all agents receive the same concatenated rules. For agent-specific instructions, include sections in your rule files like "## GitHub Copilot Specific" or "## Aider Configuration".
 
 **Q: How do I set up different instructions for different parts of my project?**
-A: Enable nested mode either by setting `nested = true` in `ruler.toml` or by passing `ruler-plus apply --nested`. The CLI inherits the config setting by default, but `--no-nested` always wins if you need to opt out for a run. Nested mode keeps loading rules (and MCP settings) from every `.ruler/` directory in the hierarchy, forces child configs to remain nested, and logs "Nested mode is experimental and may change in future releases." if any nested processing occurs.
+A: Enable nested mode either by setting `nested = true` in `ruler.toml` or by passing `ruler-plus apply <agent> --nested`. The CLI inherits the config setting by default, but `--no-nested` always wins if you need to opt out for a run. Nested mode keeps loading rules (and MCP settings) from every `.ruler/` directory in the hierarchy, forces child configs to remain nested, and logs "Nested mode is experimental and may change in future releases." if any nested processing occurs.
 
 **Q: How do I temporarily disable Ruler for an agent?**
 A: Set `enabled = false` in `ruler.toml` under `[agents.agentname]`, or use `--agents` flag to specify only the agents you want.
@@ -928,7 +910,7 @@ A: Set `enabled = false` in `ruler.toml` under `[agents.agentname]`, or use `--a
 A: Ruler creates backups with `.bak` extension before overwriting any existing files.
 
 **Q: Can I run Ruler in CI/CD pipelines?**
-A: Yes! Use `ruler-plus apply --no-gitignore` in CI to avoid modifying `.gitignore`. See the GitHub Actions example above.
+A: Yes! Use `ruler-plus apply <agent> --no-gitignore` in CI to avoid modifying `.gitignore`. See the GitHub Actions example above.
 
 **Q: How do I migrate from older versions using `instructions.md`?**
 A: Simply rename `.ruler/instructions.md` to `.ruler/AGENTS.md` (recommended). If you keep the legacy file and omit `AGENTS.md`, Ruler will still use it (without emitting the old deprecation warning). Having both causes `AGENTS.md` to take precedence; the legacy file is still concatenated afterward.

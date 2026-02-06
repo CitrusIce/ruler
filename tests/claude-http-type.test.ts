@@ -28,7 +28,7 @@ args = ["mcp-fs", "/tmp"]
   it('should output type "http" for URL-based servers in Claude config', async () => {
     const { projectRoot } = testProject;
     
-    runRulerWithInheritedStdio('apply --agents claude', projectRoot);
+    runRulerWithInheritedStdio('apply claude', projectRoot);
 
     // Verify Claude MCP config uses 'http' type for URL-based servers
     const claudeResultText = await fs.readFile(
@@ -64,7 +64,7 @@ url = "https://mcp.linear.app/sse"
       rulerTomlWithSse
     );
     
-    runRulerWithInheritedStdio('apply --agents claude', projectRoot);
+    runRulerWithInheritedStdio('apply claude', projectRoot);
 
     // Verify Claude MCP config uses 'sse' type for SSE-based servers  
     const claudeResultText = await fs.readFile(
@@ -79,11 +79,12 @@ url = "https://mcp.linear.app/sse"
     expect(claudeResult.mcpServers.linear.url).toBe('https://mcp.linear.app/sse');
   });
 
-  it('should maintain correct structure and transformations when running for all agents', async () => {
+  it('should maintain correct structure and transformations across multiple apply runs', async () => {
     const { projectRoot } = testProject;
     
-    // Run for ALL agents (not just Claude)
-    runRulerWithInheritedStdio('apply', projectRoot);
+    // Run for Claude, then another agent.
+    runRulerWithInheritedStdio('apply claude', projectRoot);
+    runRulerWithInheritedStdio('apply copilot', projectRoot);
 
     // Verify Claude MCP config has correct structure and transformations
     const claudeResultText = await fs.readFile(

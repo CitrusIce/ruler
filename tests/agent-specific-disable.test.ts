@@ -33,7 +33,8 @@ enabled = false
   it('skips disabled agent but merges others', async () => {
     const { projectRoot } = testProject;
     
-    runRulerWithInheritedStdio('apply', projectRoot);
+    runRulerWithInheritedStdio('apply copilot', projectRoot);
+    runRulerWithInheritedStdio('apply cursor', projectRoot);
     
     const copilot = JSON.parse(
       await fs.readFile(path.join(projectRoot, '.vscode', 'mcp.json'), 'utf8'),

@@ -20,7 +20,7 @@ describe('RooCodeAgent Integration', () => {
     const { projectRoot } = testProject;
 
     // Run ruler with roo agent
-    runRuler('apply --agents roo', projectRoot);
+    runRuler('apply roo', projectRoot);
 
     // Check AGENTS.md was created
     const agentsPath = path.join(projectRoot, 'AGENTS.md');
@@ -50,7 +50,7 @@ url = "https://api.example.com"`;
     await fs.writeFile(path.join(projectRoot, '.ruler', 'ruler.toml'), rulerTomlContent);
 
     // Run ruler with roo agent
-    runRuler('apply --agents roo', projectRoot);
+    runRuler('apply roo', projectRoot);
 
     // Check .roo/mcp.json has MCP servers
     const mcpPath = path.join(projectRoot, '.roo', 'mcp.json');
@@ -72,7 +72,7 @@ url = "https://api.example.com"`;
     const { projectRoot } = testProject;
 
     // First run
-    runRuler('apply --agents roo', projectRoot);
+    runRuler('apply roo', projectRoot);
     
     const agentsPath = path.join(projectRoot, 'AGENTS.md');
     const mcpPath = path.join(projectRoot, '.roo', 'mcp.json');
@@ -84,7 +84,7 @@ url = "https://api.example.com"`;
     await new Promise(resolve => setTimeout(resolve, 10));
     
     // Second run
-    runRuler('apply --agents roo', projectRoot);
+    runRuler('apply roo', projectRoot);
     
     const agentsStats2 = await fs.stat(agentsPath);
     const mcpStats2 = await fs.stat(mcpPath);
@@ -122,7 +122,7 @@ command = "updated-cmd"`;
     await fs.writeFile(path.join(projectRoot, '.ruler', 'ruler.toml'), rulerTomlContent);
 
     // Run ruler
-    runRuler('apply --agents roo', projectRoot);
+    runRuler('apply roo', projectRoot);
 
     // Check merged result
     const mcpPath = path.join(projectRoot, '.roo', 'mcp.json');

@@ -24,7 +24,7 @@ describe('apply-mcp.merge', () => {
   it('merges servers from .ruler/mcp.json and existing native config', async () => {
     const { projectRoot } = testProject;
     
-    runRulerWithInheritedStdio('apply', projectRoot);
+    runRulerWithInheritedStdio('apply copilot', projectRoot);
     
     const resultText = await fs.readFile(
       path.join(projectRoot, '.vscode', 'mcp.json'),

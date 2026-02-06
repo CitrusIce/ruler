@@ -233,7 +233,7 @@ describe('revert-engine', () => {
       jest.clearAllMocks();
     });
 
-    it('should use [ruler:dry-run] prefix when dryRun is true', async () => {
+    it('should use [ruler-plus:dry-run] prefix when dryRun is true', async () => {
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
       
       // Create a test file to trigger removal in removeAdditionalAgentFiles
@@ -244,14 +244,14 @@ describe('revert-engine', () => {
       
       const errorCalls = consoleErrorSpy.mock.calls.flat();
       const hasRulerDryRunPrefix = errorCalls.some(call => 
-        typeof call === 'string' && call.includes('[ruler:dry-run]')
+        typeof call === 'string' && call.includes('[ruler-plus:dry-run]')
       );
       
       expect(hasRulerDryRunPrefix).toBe(true);
       consoleErrorSpy.mockRestore();
     });
 
-    it('should use [ruler] prefix when dryRun is false', async () => {
+    it('should use [ruler-plus] prefix when dryRun is false', async () => {
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
       
       // Create a test file to trigger removal in removeAdditionalAgentFiles
@@ -262,7 +262,7 @@ describe('revert-engine', () => {
       
       const errorCalls = consoleErrorSpy.mock.calls.flat();
       const hasRulerPrefix = errorCalls.some(call => 
-        typeof call === 'string' && call.includes('[ruler]') && !call.includes('[ruler:dry-run]')
+        typeof call === 'string' && call.includes('[ruler-plus]') && !call.includes('[ruler-plus:dry-run]')
       );
       
       expect(hasRulerPrefix).toBe(true);

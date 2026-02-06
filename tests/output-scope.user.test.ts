@@ -23,7 +23,7 @@ args = ["hello"]
 
     try {
       runRulerWithEnv(
-        'apply --agents claude --no-skills --output-scope user',
+        'apply claude --no-skills --output-scope user',
         projectRoot,
         { HOME: home, XDG_CONFIG_HOME: xdg },
       );
@@ -72,7 +72,7 @@ args = ["hello"]
       );
 
       runRulerWithEnv(
-        'apply --agents codex --no-skills --output-scope user --mcp-overwrite',
+        'apply codex --no-skills --output-scope user --mcp-overwrite',
         projectRoot,
         { HOME: home, XDG_CONFIG_HOME: xdg },
       );
@@ -107,7 +107,7 @@ args = ["hello"]
 
     try {
       runRulerWithEnv(
-        'apply --agents opencode --no-skills --output-scope user',
+        'apply opencode --no-skills --output-scope user',
         projectRoot,
         { HOME: home, XDG_CONFIG_HOME: xdg },
       );

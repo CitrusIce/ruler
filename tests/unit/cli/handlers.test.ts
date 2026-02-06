@@ -1,5 +1,7 @@
 import {
-  applyHandler,
+  applyClaudeHandler,
+  applyCodexHandler,
+  applyOpenCodeHandler,
   initHandler,
   revertHandler,
 } from '../../../src/cli/handlers';
@@ -35,11 +37,10 @@ describe('CLI Handlers', () => {
     });
   });
 
-  describe('applyHandler', () => {
-    it('should call applyAllAgentConfigs with correct parameters', async () => {
+  describe('apply handlers', () => {
+    it('apply claude should call applyAllAgentConfigs with correct parameters', async () => {
       const argv = {
         'project-root': mockProjectRoot,
-        agents: 'copilot,claude',
         config: '/path/to/config.toml',
         mcp: true,
         'mcp-overwrite': false,
@@ -52,11 +53,11 @@ describe('CLI Handlers', () => {
         'output-scope': 'project' as const,
       };
 
-      await applyHandler(argv);
+      await applyClaudeHandler(argv);
 
       expect(applyAllAgentConfigs).toHaveBeenCalledWith(
         mockProjectRoot,
-        ['copilot', 'claude'],
+        ['claude'],
         '/path/to/config.toml',
         true,
         undefined,
@@ -68,10 +69,11 @@ describe('CLI Handlers', () => {
         true,
         undefined,
         'project',
+        undefined,
       );
     });
 
-    it('should handle mcp-overwrite correctly', async () => {
+    it('apply codex should handle mcp-overwrite correctly', async () => {
       const argv = {
         'project-root': mockProjectRoot,
         mcp: true,
@@ -84,11 +86,11 @@ describe('CLI Handlers', () => {
         'output-scope': 'project' as const,
       };
 
-      await applyHandler(argv);
+      await applyCodexHandler(argv);
 
       expect(applyAllAgentConfigs).toHaveBeenCalledWith(
         mockProjectRoot,
-        undefined,
+        ['codex'],
         undefined,
         true,
         'overwrite',
@@ -100,10 +102,11 @@ describe('CLI Handlers', () => {
         true,
         undefined,
         'project',
+        undefined,
       );
     });
 
-    it('should handle gitignore preference correctly', async () => {
+    it('apply opencode should handle gitignore preference correctly', async () => {
       const argv = {
         'project-root': mockProjectRoot,
         mcp: true,
@@ -117,11 +120,11 @@ describe('CLI Handlers', () => {
         'output-scope': 'project' as const,
       };
 
-      await applyHandler(argv);
+      await applyOpenCodeHandler(argv);
 
       expect(applyAllAgentConfigs).toHaveBeenCalledWith(
         mockProjectRoot,
-        undefined,
+        ['opencode'],
         undefined,
         true,
         undefined,
@@ -133,6 +136,7 @@ describe('CLI Handlers', () => {
         true,
         undefined,
         'project',
+        undefined,
       );
     });
 
@@ -149,11 +153,11 @@ describe('CLI Handlers', () => {
         'output-scope': 'project' as const,
       };
 
-      await applyHandler(argv);
+      await applyClaudeHandler(argv);
 
       expect(applyAllAgentConfigs).toHaveBeenCalledWith(
         mockProjectRoot,
-        undefined,
+        ['claude'],
         undefined,
         true,
         undefined,
@@ -165,6 +169,7 @@ describe('CLI Handlers', () => {
         true,
         undefined,
         'project',
+        undefined,
       );
     });
 
@@ -181,11 +186,11 @@ describe('CLI Handlers', () => {
         'output-scope': 'project' as const,
       };
 
-      await applyHandler(argv);
+      await applyClaudeHandler(argv);
 
       expect(applyAllAgentConfigs).toHaveBeenCalledWith(
         mockProjectRoot,
-        undefined,
+        ['claude'],
         undefined,
         true,
         undefined,
@@ -197,6 +202,7 @@ describe('CLI Handlers', () => {
         true,
         undefined,
         'project',
+        undefined,
       );
       // loadConfig should not be called when CLI explicitly sets nested
       expect(loadConfig).not.toHaveBeenCalled();
@@ -224,7 +230,7 @@ describe('CLI Handlers', () => {
         'output-scope': 'project' as const,
       };
 
-      await applyHandler(argv);
+      await applyClaudeHandler(argv);
 
       expect(loadConfig).toHaveBeenCalledWith({
         projectRoot: mockProjectRoot,
@@ -232,7 +238,7 @@ describe('CLI Handlers', () => {
       });
       expect(applyAllAgentConfigs).toHaveBeenCalledWith(
         mockProjectRoot,
-        undefined,
+        ['claude'],
         undefined,
         true,
         undefined,
@@ -244,6 +250,7 @@ describe('CLI Handlers', () => {
         true,
         undefined,
         'project',
+        undefined,
       );
     });
 
@@ -269,11 +276,11 @@ describe('CLI Handlers', () => {
         'output-scope': 'project' as const,
       };
 
-      await applyHandler(argv);
+      await applyClaudeHandler(argv);
 
       expect(applyAllAgentConfigs).toHaveBeenCalledWith(
         mockProjectRoot,
-        undefined,
+        ['claude'],
         undefined,
         true,
         undefined,
@@ -285,6 +292,7 @@ describe('CLI Handlers', () => {
         true,
         undefined,
         'project',
+        undefined,
       );
     });
 
@@ -310,13 +318,13 @@ describe('CLI Handlers', () => {
         'output-scope': 'project' as const,
       };
 
-      await applyHandler(argv);
+      await applyClaudeHandler(argv);
 
       // loadConfig should not be called when CLI explicitly sets nested
       expect(loadConfig).not.toHaveBeenCalled();
       expect(applyAllAgentConfigs).toHaveBeenCalledWith(
         mockProjectRoot,
-        undefined,
+        ['claude'],
         undefined,
         true,
         undefined,
@@ -328,6 +336,7 @@ describe('CLI Handlers', () => {
         true,
         undefined,
         'project',
+        undefined,
       );
     });
 
@@ -354,9 +363,9 @@ describe('CLI Handlers', () => {
         'output-scope': 'project' as const,
       };
 
-      await expect(applyHandler(argv)).rejects.toThrow('process.exit: 1');
+      await expect(applyClaudeHandler(argv)).rejects.toThrow('process.exit: 1');
 
-      expect(errorSpy).toHaveBeenCalledWith('[ruler] Test error');
+      expect(errorSpy).toHaveBeenCalledWith('[ruler-plus] Test error');
       expect(exitSpy).toHaveBeenCalledWith(1);
 
       exitSpy.mockRestore();
@@ -383,10 +392,10 @@ describe('CLI Handlers', () => {
         'output-scope': 'project' as const,
       };
 
-      await expect(applyHandler(argv)).rejects.toThrow('process.exit: 1');
+      await expect(applyClaudeHandler(argv)).rejects.toThrow('process.exit: 1');
 
       expect(errorSpy).toHaveBeenCalledWith(
-        '[ruler] Cannot run from inside a .ruler directory. Please run from your project root.',
+        '[ruler-plus] Cannot run from inside a .ruler directory. Please run from your project root.',
       );
       expect(applyAllAgentConfigs).not.toHaveBeenCalled();
 
@@ -609,7 +618,7 @@ describe('CLI Handlers', () => {
 
       await expect(revertHandler(argv)).rejects.toThrow('process.exit: 1');
 
-      expect(errorSpy).toHaveBeenCalledWith('[ruler] Test error');
+      expect(errorSpy).toHaveBeenCalledWith('[ruler-plus] Test error');
       expect(exitSpy).toHaveBeenCalledWith(1);
 
       exitSpy.mockRestore();
@@ -635,7 +644,7 @@ describe('CLI Handlers', () => {
       await expect(revertHandler(argv)).rejects.toThrow('process.exit: 1');
 
       expect(errorSpy).toHaveBeenCalledWith(
-        '[ruler] Cannot run from inside a .ruler directory. Please run from your project root.',
+        '[ruler-plus] Cannot run from inside a .ruler directory. Please run from your project root.',
       );
       expect(revertAllAgentConfigs).not.toHaveBeenCalled();
 

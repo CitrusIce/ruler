@@ -21,10 +21,12 @@ describe('mcp.json warning deduplication', () => {
 
   it('shows exactly one warning per apply call', async () => {
     const { projectRoot } = testProject;
-    const output = runRulerAll('apply', projectRoot);
+    const output = runRulerAll('apply copilot', projectRoot);
     
     // Count occurrences of the warning
-    const warningMatches = output.match(/\[ruler\] Warning: Using legacy \.ruler\/mcp\.json/g);
+    const warningMatches = output.match(
+      /\[ruler-plus\] Warning: Using legacy \.ruler\/mcp\.json/g,
+    );
     const warningCount = warningMatches ? warningMatches.length : 0;
     
     expect(warningCount).toBe(1);

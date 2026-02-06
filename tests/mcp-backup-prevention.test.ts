@@ -42,7 +42,7 @@ describe('MCP Backup Prevention for All Agents', () => {
       try { await fs.rm(backupPath, { force: true }); } catch {}
       
       // Run ruler apply with specific agent
-      await runRuler(`apply --agents ${name}`, projectRoot);
+      await runRuler(`apply ${name}`, projectRoot);
 
       // Check that the main config file exists
       const mainFileExists = await fs.access(fullConfigPath).then(() => true).catch(() => false);
@@ -64,13 +64,13 @@ describe('MCP Backup Prevention for All Agents', () => {
 
   it('should handle idempotent re-runs without creating backup files', async () => {
     // Run twice with gemini to test idempotency
-    await runRuler('apply --agents gemini-cli', projectRoot);
+    await runRuler('apply gemini-cli', projectRoot);
     
     const settingsPath = path.join(projectRoot, '.gemini', 'settings.json');
     const firstContent = await fs.readFile(settingsPath, 'utf8');
     
     // Run again
-    await runRuler('apply --agents gemini-cli', projectRoot);
+    await runRuler('apply gemini-cli', projectRoot);
     
     const secondContent = await fs.readFile(settingsPath, 'utf8');
     const backupPath = settingsPath + '.bak';

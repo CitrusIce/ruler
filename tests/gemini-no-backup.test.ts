@@ -27,7 +27,7 @@ describe('Gemini Backup Behavior Test', () => {
 
   it('should not create backup files when MCP is handled correctly in applyRulerConfig', async () => {
     // Run ruler apply with only gemini-cli
-    await runRuler('apply --agents gemini-cli', projectRoot);
+    await runRuler('apply gemini-cli', projectRoot);
 
     const settingsPath = path.join(projectRoot, '.gemini', 'settings.json');
     const settingsBakPath = settingsPath + '.bak';

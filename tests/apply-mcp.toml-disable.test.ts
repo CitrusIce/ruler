@@ -33,7 +33,7 @@ url = "https://example.com"
     const nativePath = path.join(projectRoot, '.vscode', 'mcp.json');
     const before = await fs.readFile(nativePath, 'utf8');
     
-    runRuler('apply --agents copilot', projectRoot);
+    runRuler('apply copilot', projectRoot);
     
     const after = await fs.readFile(nativePath, 'utf8');
     expect(after).toEqual(before);

@@ -1,10 +1,10 @@
-export const ERROR_PREFIX = '[ruler]';
+export const ERROR_PREFIX = '[ruler-plus]';
 // Centralized default rules filename. Now points to 'AGENTS.md'.
 // Legacy '.ruler/instructions.md' is still supported as a fallback with a warning.
 export const DEFAULT_RULES_FILENAME = 'AGENTS.md';
 
 export function actionPrefix(dry: boolean): string {
-  return dry ? '[ruler:dry-run]' : '[ruler]';
+  return dry ? '[ruler-plus:dry-run]' : '[ruler-plus]';
 }
 
 export function createRulerError(message: string, context?: string): Error {
@@ -16,7 +16,7 @@ export function createRulerError(message: string, context?: string): Error {
 
 export function logVerbose(message: string, isVerbose: boolean): void {
   if (isVerbose) {
-    console.error(`[ruler:verbose] ${message}`);
+    console.error(`[ruler-plus:verbose] ${message}`);
   }
 }
 

@@ -31,7 +31,8 @@ describe('mcp-key-per-agent', () => {
   it('should use "servers" key for Copilot and "mcpServers" key for Cursor', async () => {
     const { projectRoot } = testProject;
     
-    runRulerWithInheritedStdio('apply --agents copilot,cursor', projectRoot);
+    runRulerWithInheritedStdio('apply copilot', projectRoot);
+    runRulerWithInheritedStdio('apply cursor', projectRoot);
 
     // Verify Copilot MCP config uses 'servers' key
     const copilotResultText = await fs.readFile(

@@ -7,11 +7,11 @@ describe('constants', () => {
 
   describe('actionPrefix', () => {
     it('returns [ruler:dry-run] when dry is true', () => {
-      expect(actionPrefix(true)).toBe('[ruler:dry-run]');
+      expect(actionPrefix(true)).toBe('[ruler-plus:dry-run]');
     });
 
     it('returns [ruler] when dry is false', () => {
-      expect(actionPrefix(false)).toBe('[ruler]');
+      expect(actionPrefix(false)).toBe('[ruler-plus]');
     });
   });
 });

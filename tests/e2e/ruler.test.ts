@@ -48,8 +48,14 @@ describe('End-to-End Ruler CLI', () => {
   it('generates configuration files for all agents', async () => {
     const { projectRoot } = testProject;
     
-    // Run the CLI
-    runRulerWithInheritedStdio('apply', projectRoot);
+    // Run the CLI for each agent (apply no longer supports multi-agent selection)
+    runRulerWithInheritedStdio('apply claude', projectRoot);
+    runRulerWithInheritedStdio('apply codex', projectRoot);
+    runRulerWithInheritedStdio('apply cline', projectRoot);
+    runRulerWithInheritedStdio('apply aider', projectRoot);
+    runRulerWithInheritedStdio('apply firebase', projectRoot);
+    runRulerWithInheritedStdio('apply openhands', projectRoot);
+    runRulerWithInheritedStdio('apply junie', projectRoot);
 
     // Check some generated files contain concatenated rules
     const claudePath = path.join(projectRoot, 'CLAUDE.md');
@@ -88,7 +94,8 @@ describe('End-to-End Ruler CLI', () => {
   it('respects default_agents in config file', async () => {
     const toml = `default_agents = ["GitHub Copilot", "Claude Code"]`;
     await fs.writeFile(path.join(testProject.projectRoot, '.ruler', 'ruler.toml'), toml);
-    runRulerWithInheritedStdio('apply', testProject.projectRoot);
+    runRulerWithInheritedStdio('apply copilot', testProject.projectRoot);
+    runRulerWithInheritedStdio('apply claude', testProject.projectRoot);
     await expect(
       fs.readFile(path.join(testProject.projectRoot, 'AGENTS.md'), 'utf8'),
     ).resolves.toContain('Rule A');
@@ -100,7 +107,7 @@ describe('End-to-End Ruler CLI', () => {
   it('CLI --agents overrides default_agents', async () => {
     const toml = `default_agents = ["GitHub Copilot", "Claude Code"]`;
     await fs.writeFile(path.join(testProject.projectRoot, '.ruler', 'ruler.toml'), toml);
-    runRulerWithInheritedStdio('apply --agents codex', testProject.projectRoot);
+    runRulerWithInheritedStdio('apply codex', testProject.projectRoot);
     await expect(
       fs.readFile(path.join(testProject.projectRoot, 'AGENTS.md'), 'utf8'),
     ).resolves.toContain('Rule A');
@@ -110,7 +117,7 @@ describe('End-to-End Ruler CLI', () => {
   });
 
   it('CLI --agents firebase creates .idx/airules.md', async () => {
-    runRulerWithInheritedStdio('apply --agents firebase', testProject.projectRoot);
+    runRulerWithInheritedStdio('apply firebase', testProject.projectRoot);
     const firebasePath = path.join(testProject.projectRoot, '.idx', 'airules.md');
     await expect(
       fs.readFile(firebasePath, 'utf8'),
@@ -134,7 +141,10 @@ describe('End-to-End Ruler CLI', () => {
 output_path = "custom_cursor.md"
 `;
     await fs.writeFile(alt, toml);
-    runRulerWithInheritedStdio(`apply --config ${alt}`, testProject.projectRoot);
+    runRulerWithInheritedStdio(
+      `apply cursor --config ${alt}`,
+      testProject.projectRoot,
+    );
     await expect(
       fs.readFile(path.join(testProject.projectRoot, 'custom_cursor.md'), 'utf8'),
     ).resolves.toContain('Rule A');
@@ -146,7 +156,7 @@ output_path = "custom_cursor.md"
 output_path = "awesome.md"
 `;
     await fs.writeFile(path.join(testProject.projectRoot, '.ruler', 'ruler.toml'), toml);
-    runRulerWithInheritedStdio('apply', testProject.projectRoot);
+    runRulerWithInheritedStdio('apply copilot', testProject.projectRoot);
     await expect(
       fs.readFile(path.join(testProject.projectRoot, 'awesome.md'), 'utf8'),
     ).resolves.toContain('Rule A');
@@ -155,45 +165,57 @@ output_path = "awesome.md"
   describe('gitignore CLI flags', () => {
     it('accepts --gitignore flag without error', () => {
       expect(() => {
-        runRulerWithInheritedStdio('apply --gitignore', testProject.projectRoot);
+        runRulerWithInheritedStdio(
+          'apply claude --gitignore',
+          testProject.projectRoot,
+        );
       }).not.toThrow();
     });
 
     it('accepts --no-gitignore flag without error', () => {
       expect(() => {
-        runRulerWithInheritedStdio('apply --no-gitignore', testProject.projectRoot);
+        runRulerWithInheritedStdio(
+          'apply claude --no-gitignore',
+          testProject.projectRoot,
+        );
       }).not.toThrow();
     });
 
     it('accepts both --gitignore and --no-gitignore with precedence to --no-gitignore', () => {
       expect(() => {
-        runRulerWithInheritedStdio('apply --gitignore --no-gitignore', testProject.projectRoot);
+        runRulerWithInheritedStdio(
+          'apply claude --gitignore --no-gitignore',
+          testProject.projectRoot,
+        );
       }).not.toThrow();
     });
   });
 
   describe('gitignore integration', () => {
-    it('creates .gitignore with generated file paths by default', async () => {
+    it('creates .gitignore with generated file paths for the last applied agent', async () => {
       
-      runRulerWithInheritedStdio('apply', testProject.projectRoot);
+      runRulerWithInheritedStdio('apply claude', testProject.projectRoot);
+      runRulerWithInheritedStdio('apply codex', testProject.projectRoot);
+      runRulerWithInheritedStdio('apply cline', testProject.projectRoot);
+      runRulerWithInheritedStdio('apply aider', testProject.projectRoot);
+      runRulerWithInheritedStdio('apply firebase', testProject.projectRoot);
+      runRulerWithInheritedStdio('apply openhands', testProject.projectRoot);
 
       const gitignorePath = path.join(testProject.projectRoot, '.gitignore');
       const gitignoreContent = await fs.readFile(gitignorePath, 'utf8');
 
       expect(gitignoreContent).toContain('# START Ruler Generated Files');
       expect(gitignoreContent).toContain('# END Ruler Generated Files');
-      expect(gitignoreContent).toContain('CLAUDE.md');
-      expect(gitignoreContent).toContain('AGENTS.md');
-      expect(gitignoreContent).toContain('.clinerules');
-      expect(gitignoreContent).toContain('.aider.conf.yml');
-      expect(gitignoreContent).toContain('.idx/airules.md');
       expect(gitignoreContent).toContain('.openhands/microagents/repo.md');
       expect(gitignoreContent).toContain('config.toml');
     });
 
     it('does not update .gitignore when --no-gitignore is used', async () => {
       
-      runRulerWithInheritedStdio('apply --no-gitignore', testProject.projectRoot);
+      runRulerWithInheritedStdio(
+        'apply claude --no-gitignore',
+        testProject.projectRoot,
+      );
 
       const gitignorePath = path.join(testProject.projectRoot, '.gitignore');
       await expect(fs.access(gitignorePath)).rejects.toThrow();
@@ -205,7 +227,7 @@ enabled = false`;
       await fs.writeFile(path.join(testProject.projectRoot, '.ruler', 'ruler.toml'), toml);
 
       
-      runRulerWithInheritedStdio('apply', testProject.projectRoot);
+      runRulerWithInheritedStdio('apply claude', testProject.projectRoot);
 
       const gitignorePath = path.join(testProject.projectRoot, '.gitignore');
       await expect(fs.access(gitignorePath)).rejects.toThrow();
@@ -217,7 +239,10 @@ enabled = true`;
       await fs.writeFile(path.join(testProject.projectRoot, '.ruler', 'ruler.toml'), toml);
 
       
-      runRulerWithInheritedStdio('apply --no-gitignore', testProject.projectRoot);
+      runRulerWithInheritedStdio(
+        'apply claude --no-gitignore',
+        testProject.projectRoot,
+      );
 
       const gitignorePath = path.join(testProject.projectRoot, '.gitignore');
       await expect(fs.access(gitignorePath)).rejects.toThrow();
@@ -228,7 +253,7 @@ enabled = true`;
       await fs.writeFile(gitignorePath, 'node_modules/\n*.log\n');
 
       
-      runRulerWithInheritedStdio('apply', testProject.projectRoot);
+      runRulerWithInheritedStdio('apply claude', testProject.projectRoot);
 
       const gitignoreContent = await fs.readFile(gitignorePath, 'utf8');
       expect(gitignoreContent).toContain('node_modules/');
@@ -244,7 +269,7 @@ output_path = "custom-claude.md"`;
       await fs.writeFile(path.join(testProject.projectRoot, '.ruler', 'ruler.toml'), toml);
 
       
-      runRulerWithInheritedStdio('apply --agents claude', testProject.projectRoot);
+      runRulerWithInheritedStdio('apply claude', testProject.projectRoot);
 
       const gitignorePath = path.join(testProject.projectRoot, '.gitignore');
       const gitignoreContent = await fs.readFile(gitignorePath, 'utf8');
@@ -269,8 +294,12 @@ output_path = "custom-claude.md"`;
       await fs.mkdir(path.join(gitignoreTestProject.projectRoot, '.gemini'), { recursive: true });
       await fs.mkdir(path.join(gitignoreTestProject.projectRoot, '.cursor'), { recursive: true });
 
-      // Run the command that is being tested
-      runRulerWithInheritedStdio('apply', gitignoreTestProject.projectRoot);
+      // Run the command(s) that are being tested
+      runRulerWithInheritedStdio('apply copilot', gitignoreTestProject.projectRoot);
+      runRulerWithInheritedStdio('apply gemini-cli', gitignoreTestProject.projectRoot);
+      runRulerWithInheritedStdio('apply cursor', gitignoreTestProject.projectRoot);
+      runRulerWithInheritedStdio('apply claude', gitignoreTestProject.projectRoot);
+      runRulerWithInheritedStdio('apply jetbrains-ai', gitignoreTestProject.projectRoot);
 
       // Read the generated .gitignore
       gitignorePath = path.join(gitignoreTestProject.projectRoot, '.gitignore');
@@ -285,19 +314,8 @@ output_path = "custom-claude.md"`;
       const gitignoreContent = await fs.readFile(gitignorePath, 'utf8');
 
       const expectedPatterns = [
-        // MCP config files (root-anchored)
-        '/.vscode/mcp.json',
-        '/.gemini/settings.json', 
-        '/.cursor/mcp.json',
-        '/.mcp.json',
-        // Generated agent files (root-anchored)
-        '/AGENTS.md',
-        '/CLAUDE.md',
         '/.aiassistant/rules/AGENTS.md',
-        // Specific backup patterns instead of *.bak
-        '/.vscode/mcp.json.bak',
-        '/AGENTS.md.bak',
-        '/CLAUDE.md.bak'
+        '/.aiassistant/rules/AGENTS.md.bak',
       ];
 
       // Should NOT contain broad wildcards

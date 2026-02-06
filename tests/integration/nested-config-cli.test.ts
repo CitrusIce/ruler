@@ -48,7 +48,7 @@ describe('CLI nested toggle precedence', () => {
   it('activates nested processing when config sets nested = true', async () => {
     await writeNestedProjectConfig({ nestedTomlValue: true });
 
-    runRulerWithInheritedStdio('apply --agents claude', projectRoot);
+    runRulerWithInheritedStdio('apply claude', projectRoot);
 
     await expect(
       fs.readFile(path.join(projectRoot, 'module', 'CLAUDE.md'), 'utf8'),
@@ -58,7 +58,7 @@ describe('CLI nested toggle precedence', () => {
   it('remains flat when config sets nested = false and CLI omits --nested', async () => {
     await writeNestedProjectConfig({ nestedTomlValue: false });
 
-    runRulerWithInheritedStdio('apply --agents claude', projectRoot);
+    runRulerWithInheritedStdio('apply claude', projectRoot);
 
     await expect(
       fs.stat(path.join(projectRoot, 'module', 'CLAUDE.md')),
@@ -68,7 +68,7 @@ describe('CLI nested toggle precedence', () => {
   it('prefers CLI --nested over a config that sets nested = false', async () => {
     await writeNestedProjectConfig({ nestedTomlValue: false });
 
-    runRulerWithInheritedStdio('apply --agents claude --nested', projectRoot);
+    runRulerWithInheritedStdio('apply claude --nested', projectRoot);
 
     await expect(
       fs.readFile(path.join(projectRoot, 'module', 'CLAUDE.md'), 'utf8'),

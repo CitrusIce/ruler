@@ -4,13 +4,12 @@ import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs/promises';
 import { ERROR_PREFIX, DEFAULT_RULES_FILENAME } from '../constants';
-import { McpStrategy, OutputScope } from '../types';
+import { McpStrategy, ModelsConfig, OutputScope } from '../types';
 import { loadConfig } from '../core/ConfigLoader';
 import { importToRuler } from '../import';
 
-export interface ApplyArgs {
+export interface ApplyCommonArgs {
   'project-root': string;
-  agents?: string;
   config?: string;
   mcp: boolean;
   'mcp-overwrite': boolean;
@@ -22,6 +21,28 @@ export interface ApplyArgs {
   backup: boolean;
   skills?: boolean;
   'output-scope': OutputScope;
+}
+
+export interface ApplyClaudeArgs extends ApplyCommonArgs {
+  model?: string;
+  'base-url'?: string;
+  'auth-token'?: string;
+  'api-key'?: string;
+}
+
+export interface ApplyCodexArgs extends ApplyCommonArgs {
+  model?: string;
+  'model-provider'?: string;
+  'openai-api-key'?: string;
+}
+
+export interface ApplyOpenCodeArgs extends ApplyCommonArgs {
+  model?: string;
+  'small-model'?: string;
+}
+
+export interface ApplyGenericArgs extends ApplyCommonArgs {
+  agent: string;
 }
 
 export interface InitArgs {
@@ -55,15 +76,34 @@ function assertNotInsideRulerDir(projectRoot: string): void {
   }
 }
 
-/**
- * Handler for the 'apply' command.
- */
-export async function applyHandler(argv: ApplyArgs): Promise<void> {
+async function resolveNested(
+  argv: ApplyCommonArgs,
+  projectRoot: string,
+  configPath: string | undefined,
+): Promise<boolean> {
+  if (argv.nested !== undefined) {
+    return argv.nested;
+  }
+
+  try {
+    const config = await loadConfig({
+      projectRoot,
+      configPath,
+    });
+    return config.nested ?? false;
+  } catch {
+    return false;
+  }
+}
+
+async function applySingleAgent(
+  agent: string,
+  argv: ApplyCommonArgs,
+  modelsOverride?: ModelsConfig,
+): Promise<void> {
   const projectRoot = argv['project-root'];
   assertNotInsideRulerDir(projectRoot);
-  const agents = argv.agents
-    ? argv.agents.split(',').map((a) => a.trim())
-    : undefined;
+
   const configPath = argv.config;
   const mcpEnabled = argv.mcp;
   const mcpStrategy: McpStrategy | undefined = argv['mcp-overwrite']
@@ -76,35 +116,14 @@ export async function applyHandler(argv: ApplyArgs): Promise<void> {
   const outputScope = argv['output-scope'] ?? 'project';
 
   // Determine gitignore preference: CLI > TOML > Default (enabled)
-  // yargs handles --no-gitignore by setting gitignore to false
   let gitignorePreference: boolean | undefined;
   if (argv.gitignore !== undefined) {
     gitignorePreference = argv.gitignore;
   } else {
-    gitignorePreference = undefined; // Let TOML/default decide
+    gitignorePreference = undefined;
   }
 
-  // Determine nested preference: CLI > TOML > Default (false)
-  let nested: boolean;
-
-  if (argv.nested !== undefined) {
-    // CLI explicitly set nested (either --nested or --no-nested)
-    nested = argv.nested;
-  } else {
-    // CLI didn't set nested, check TOML configuration
-    try {
-      const config = await loadConfig({
-        projectRoot,
-        configPath,
-      });
-      // Use TOML setting if available, otherwise default to false
-      nested = config.nested ?? false;
-    } catch {
-      // If config loading fails, use default (false)
-      nested = false;
-    }
-  }
-
+  const nested = await resolveNested(argv, projectRoot, configPath);
   if (nested && outputScope !== 'project') {
     throw new Error(
       'User-scope outputs are not supported with --nested yet (ambiguous precedence). Run without --nested or use --output-scope project.',
@@ -112,30 +131,117 @@ export async function applyHandler(argv: ApplyArgs): Promise<void> {
   }
 
   // Determine skills preference: CLI > TOML > Default (enabled)
-  let skillsEnabled: boolean | undefined;
-  if (argv.skills !== undefined) {
-    skillsEnabled = argv.skills;
-  } else {
-    skillsEnabled = undefined; // Let config/default decide
-  }
+  const skillsEnabled = argv.skills !== undefined ? argv.skills : undefined;
 
+  await applyAllAgentConfigs(
+    projectRoot,
+    [agent],
+    configPath,
+    mcpEnabled,
+    mcpStrategy,
+    gitignorePreference,
+    verbose,
+    dryRun,
+    localOnly,
+    nested,
+    backup,
+    skillsEnabled,
+    outputScope,
+    modelsOverride,
+  );
+}
+
+export async function applyGenericHandler(
+  argv: ApplyGenericArgs,
+): Promise<void> {
   try {
-    await applyAllAgentConfigs(
-      projectRoot,
-      agents,
-      configPath,
-      mcpEnabled,
-      mcpStrategy,
-      gitignorePreference,
-      verbose,
-      dryRun,
-      localOnly,
-      nested,
-      backup,
-      skillsEnabled,
-      outputScope,
+    await applySingleAgent(argv.agent, argv);
+    console.log('ruler-plus apply completed successfully.');
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`${ERROR_PREFIX} ${message}`);
+    process.exit(1);
+  }
+}
+
+export async function applyClaudeHandler(argv: ApplyClaudeArgs): Promise<void> {
+  try {
+    const modelsOverride: ModelsConfig = {
+      claude: {
+        model: argv.model,
+        base_url: argv['base-url'],
+        auth_env_key: argv['auth-token']
+          ? 'ANTHROPIC_AUTH_TOKEN'
+          : argv['api-key']
+            ? 'ANTHROPIC_API_KEY'
+            : undefined,
+        auth_value: argv['auth-token'] ?? argv['api-key'],
+      },
+    };
+
+    // Avoid overriding from CLI when no model-related flags are set.
+    const hasOverride =
+      !!argv.model ||
+      !!argv['base-url'] ||
+      !!argv['auth-token'] ||
+      !!argv['api-key'];
+
+    await applySingleAgent(
+      'claude',
+      argv,
+      hasOverride ? modelsOverride : undefined,
     );
-    console.log('Ruler apply completed successfully.');
+    console.log('ruler-plus apply completed successfully.');
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`${ERROR_PREFIX} ${message}`);
+    process.exit(1);
+  }
+}
+
+export async function applyCodexHandler(argv: ApplyCodexArgs): Promise<void> {
+  try {
+    const modelsOverride: ModelsConfig = {
+      codex: {
+        model_provider: argv['model-provider'],
+        model: argv.model,
+        openai_api_key: argv['openai-api-key'],
+      },
+    };
+    const hasOverride =
+      !!argv.model || !!argv['model-provider'] || !!argv['openai-api-key'];
+
+    await applySingleAgent(
+      'codex',
+      argv,
+      hasOverride ? modelsOverride : undefined,
+    );
+    console.log('ruler-plus apply completed successfully.');
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`${ERROR_PREFIX} ${message}`);
+    process.exit(1);
+  }
+}
+
+export async function applyOpenCodeHandler(
+  argv: ApplyOpenCodeArgs,
+): Promise<void> {
+  try {
+    const modelsOverride: ModelsConfig = {
+      opencode: {
+        model: argv.model,
+        small_model: argv['small-model'],
+      },
+    };
+    const hasOverride = !!argv.model || !!argv['small-model'];
+
+    await applySingleAgent(
+      'opencode',
+      argv,
+      hasOverride ? modelsOverride : undefined,
+    );
+    console.log('ruler-plus apply completed successfully.');
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
     console.error(`${ERROR_PREFIX} ${message}`);

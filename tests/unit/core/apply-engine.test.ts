@@ -635,7 +635,7 @@ command = "sub-cmd"
       jest.clearAllMocks();
     });
 
-    it('should use [ruler:dry-run] prefix when dryRun is true', async () => {
+    it('should use [ruler-plus:dry-run] prefix when dryRun is true', async () => {
       const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
       const mockAgents = [new MockAgent('Claude Code', 'claude')];
       const config: LoadedConfig = { agentConfigs: {} };
@@ -656,14 +656,15 @@ command = "sub-cmd"
 
       const logCalls = consoleLogSpy.mock.calls.flat();
       const hasRulerDryRunPrefix = logCalls.some(
-        (call) => typeof call === 'string' && call.includes('[ruler:dry-run]'),
+        (call) =>
+          typeof call === 'string' && call.includes('[ruler-plus:dry-run]'),
       );
 
       expect(hasRulerDryRunPrefix).toBe(true);
       consoleLogSpy.mockRestore();
     });
 
-    it('should use [ruler] prefix when dryRun is false', async () => {
+    it('should use [ruler-plus] prefix when dryRun is false', async () => {
       const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
       const mockAgents = [new MockAgent('Claude Code', 'claude')];
       const config: LoadedConfig = { agentConfigs: {} };
@@ -686,8 +687,8 @@ command = "sub-cmd"
       const hasRulerPrefix = logCalls.some(
         (call) =>
           typeof call === 'string' &&
-          call.includes('[ruler]') &&
-          !call.includes('[ruler:dry-run]'),
+          call.includes('[ruler-plus]') &&
+          !call.includes('[ruler-plus:dry-run]'),
       );
 
       expect(hasRulerPrefix).toBe(true);

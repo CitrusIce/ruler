@@ -35,7 +35,7 @@ args = ["-y", "@modelcontextprotocol/server-git", "--repository", "."]
   it('omits type fields in .idx/mcp.json', async () => {
     const { projectRoot } = testProject;
 
-    runRuler('apply --agents firebase', projectRoot);
+    runRuler('apply firebase', projectRoot);
 
     const nativePath = path.join(projectRoot, '.idx', 'mcp.json');
     const content = await fs.readFile(nativePath, 'utf8');

@@ -31,7 +31,8 @@ describe('mcp-key-overwrite', () => {
   it('should overwrite with correct keys for different agents', async () => {
     const { projectRoot } = testProject;
     
-    runRulerWithInheritedStdio('apply --agents copilot,cursor --mcp-overwrite', projectRoot);
+    runRulerWithInheritedStdio('apply copilot --mcp-overwrite', projectRoot);
+    runRulerWithInheritedStdio('apply cursor --mcp-overwrite', projectRoot);
 
     // Verify Copilot MCP config was overwritten and uses 'servers' key
     const copilotResultText = await fs.readFile(

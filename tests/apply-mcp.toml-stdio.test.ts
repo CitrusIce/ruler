@@ -33,7 +33,7 @@ args = ["-y", "@modelcontextprotocol/server-git", "--repository", "."]
   it('applies TOML-defined stdio MCP servers to native config', async () => {
     const { projectRoot } = testProject;
     
-    runRuler('apply --agents copilot', projectRoot);
+    runRuler('apply copilot', projectRoot);
     
     const nativePath = path.join(projectRoot, '.vscode', 'mcp.json');
     const content = await fs.readFile(nativePath, 'utf8');

@@ -24,7 +24,7 @@ describe('apply-mcp.overwrite', () => {
   it('overwrites existing native config when --mcp-overwrite is used', async () => {
     const { projectRoot } = testProject;
     
-    runRulerWithInheritedStdio('apply --mcp-overwrite', projectRoot);
+    runRulerWithInheritedStdio('apply copilot --mcp-overwrite', projectRoot);
     
     const resultText = await fs.readFile(
       path.join(projectRoot, '.vscode', 'mcp.json'),

@@ -60,7 +60,7 @@ describe('Revert CLI Integration', () => {
         stdio: 'pipe'
       });
 
-      expect(output).toContain('[ruler:dry-run]');
+      expect(output).toContain('[ruler-plus:dry-run]');
       expect(output).toContain('Revert summary (dry run)');
     });
 
@@ -98,7 +98,7 @@ describe('Revert CLI Integration', () => {
       });
       
       expect(output.length).toBeGreaterThan(100);
-      expect(output).toContain('[ruler:dry-run]');
+      expect(output).toContain('[ruler-plus:dry-run]');
     });
 
     it('should handle --dry-run option', async () => {
@@ -110,7 +110,7 @@ describe('Revert CLI Integration', () => {
         stdio: 'pipe'
       });
       
-      expect(output).toContain('[ruler:dry-run]');
+      expect(output).toContain('[ruler-plus:dry-run]');
       expect(output).toContain('Revert summary (dry run)');
       
       await expect(fs.access(testFile)).resolves.toBeUndefined();
@@ -122,7 +122,7 @@ describe('Revert CLI Integration', () => {
         stdio: 'pipe'
       });
       
-      expect(output).toContain('[ruler:dry-run]');
+      expect(output).toContain('[ruler-plus:dry-run]');
     });
   });
 
@@ -142,7 +142,7 @@ describe('Revert CLI Integration', () => {
         stdio: 'pipe'
       });
       
-      expect(output).toContain('[ruler:dry-run]');
+      expect(output).toContain('[ruler-plus:dry-run]');
     });
   });
 
@@ -174,7 +174,8 @@ describe('Revert CLI Integration', () => {
 
   describe('Integration with Apply', () => {
     it('should revert everything that apply creates', async () => {
-      execSync(`node dist/cli/index.js apply --project-root ${tmpDir}`, { stdio: 'inherit' });
+      execSync(`node dist/cli/index.js apply claude --project-root ${tmpDir}`, { stdio: 'inherit' });
+      execSync(`node dist/cli/index.js apply codex --project-root ${tmpDir}`, { stdio: 'inherit' });
       
       await expect(fs.access(path.join(tmpDir, 'CLAUDE.md'))).resolves.toBeUndefined();
       await expect(fs.access(path.join(tmpDir, 'AGENTS.md'))).resolves.toBeUndefined();

@@ -33,7 +33,7 @@ describe('Root AGENTS.md detection', () => {
     await fs.writeFile(rootAgentsPath, 'Root priority content', 'utf8');
 
     // Run apply to generate agent outputs (use a single agent for simplicity)
-    runRulerWithInheritedStdio('apply --agents codex', projectRoot);
+    runRulerWithInheritedStdio('apply codex', projectRoot);
 
     const codexOutput = await fs.readFile(path.join(projectRoot, 'AGENTS.md'), 'utf8');
     // Expect root content appears before inner content by checking order of markers
@@ -51,7 +51,7 @@ describe('Root AGENTS.md detection', () => {
     // Ensure root AGENTS.md absent
     await fs.rm(path.join(projectRoot, 'AGENTS.md'), { force: true });
 
-    runRulerWithInheritedStdio('apply --agents codex', projectRoot);
+    runRulerWithInheritedStdio('apply codex', projectRoot);
     const codexOutput = await fs.readFile(path.join(projectRoot, 'AGENTS.md'), 'utf8');
     expect(codexOutput).toContain('Inner rules file');
     expect(codexOutput).toContain('Extra inner file');

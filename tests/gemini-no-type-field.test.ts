@@ -31,7 +31,7 @@ headers = { Authorization = "Bearer secret" }
 
   it('should not include type field in Gemini CLI settings.json (following Nov 2025 MCP spec update)', async () => {
     // Run ruler apply with gemini-cli
-    await runRuler('apply --agents gemini-cli', projectRoot);
+    await runRuler('apply gemini-cli', projectRoot);
 
     const settingsPath = path.join(projectRoot, '.gemini', 'settings.json');
 
@@ -93,7 +93,7 @@ headers = { Authorization = "Bearer secret" }
     );
 
     // Run ruler apply again
-    await runRuler('apply --agents gemini-cli', projectRoot);
+    await runRuler('apply gemini-cli', projectRoot);
 
     // Read and verify
     const settingsContent = await fs.readFile(settingsPath, 'utf8');

@@ -22,7 +22,8 @@ describe('Gemini MCP merge even if AGENTS.md already written by Jules', () => {
   });
 
   it('keeps mcpServers in .gemini/settings.json when running jules,gemini-cli', async () => {
-    runRulerWithInheritedStdio('apply --agents jules,gemini-cli', projectRoot);
+    runRulerWithInheritedStdio('apply jules', projectRoot);
+    runRulerWithInheritedStdio('apply gemini-cli', projectRoot);
     const settingsPath = path.join(projectRoot, '.gemini', 'settings.json');
     const raw = await fs.readFile(settingsPath, 'utf8');
     const json = JSON.parse(raw);
@@ -30,4 +31,3 @@ describe('Gemini MCP merge even if AGENTS.md already written by Jules', () => {
     expect(Object.keys(json.mcpServers)).toContain('ex');
   });
 });
-

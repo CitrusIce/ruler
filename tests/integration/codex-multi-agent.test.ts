@@ -29,17 +29,18 @@ describe('Codex config generation with multiple AGENTS.md writers', () => {
   });
 
   it('writes .codex/config.toml when running jules,codex', async () => {
-    runRulerWithInheritedStdio('apply --agents jules,codex', project.projectRoot);
+    runRulerWithInheritedStdio('apply jules', project.projectRoot);
+    runRulerWithInheritedStdio('apply codex', project.projectRoot);
     const codexToml = path.join(project.projectRoot, '.codex', 'config.toml');
     const content = await fs.readFile(codexToml, 'utf8');
     expect(content).toMatch(/\[mcp_servers\.example_server\]/);
   });
 
   it('writes .codex/config.toml when running codex,jules', async () => {
-    runRulerWithInheritedStdio('apply --agents codex,jules', project.projectRoot);
+    runRulerWithInheritedStdio('apply codex', project.projectRoot);
+    runRulerWithInheritedStdio('apply jules', project.projectRoot);
     const codexToml = path.join(project.projectRoot, '.codex', 'config.toml');
     const content = await fs.readFile(codexToml, 'utf8');
     expect(content).toMatch(/\[mcp_servers\.example_server\]/);
   });
 });
-

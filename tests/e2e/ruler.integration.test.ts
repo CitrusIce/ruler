@@ -188,9 +188,31 @@ File: extra-rules.md
     await fs.writeFile(extraMdFile, extraMdContent);
     console.log('✓ Additional markdown file created for concatenation testing');
 
-    // Step 5: Run ruler apply
+    // Step 5: Run ruler apply for each agent (apply no longer supports multi-agent selection)
     console.log('\n5. Running ruler apply...');
-    runRulerWithInheritedStdio('apply', projectRoot);
+    const agentsToApply = [
+      'copilot',
+      'claude',
+      'crush',
+      'cursor',
+      'opencode',
+      'gemini-cli',
+      'codex',
+      'zed',
+      'augmentcode',
+      'qwen',
+      'aider',
+      'openhands',
+      'kilocode',
+      'windsurf',
+      'cline',
+      'goose',
+      'junie',
+      'jetbrains-ai',
+    ];
+    for (const agent of agentsToApply) {
+      runRulerWithInheritedStdio(`apply ${agent}`, projectRoot);
+    }
     console.log('✓ ruler apply completed successfully');
 
     // Step 6: Inspect all generated files
@@ -409,10 +431,8 @@ File: extra-rules.md
     if (fileContents['.gitignore']) {
       expect(fileContents['.gitignore']).toContain('# START Ruler Generated Files');
       expect(fileContents['.gitignore']).toContain('# END Ruler Generated Files');
-      // Should contain entries for some of the files we're generating
-      expect(fileContents['.gitignore']).toContain('opencode.json');
-      expect(fileContents['.gitignore']).toContain('.gemini/settings.json');
-      // Note: .codex/config.toml might not be in gitignore if agent doesn't register it
+      // gitignore block reflects the last apply command in this sequence (jetbrains-ai)
+      expect(fileContents['.gitignore']).toContain('.aiassistant/rules/AGENTS.md');
       console.log('✓ .gitignore contains comprehensive Ruler-generated entries');
     }
 

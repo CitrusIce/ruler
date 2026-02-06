@@ -38,7 +38,7 @@ Authorization = "Bearer TOKEN123"
     const { projectRoot } = testProject;
 
     // Run ruler apply for Firebase agent (stdio-only)
-    runRuler('apply --agents firebase', projectRoot);
+    runRuler('apply firebase', projectRoot);
 
     // Check the generated config
     const configPath = path.join(projectRoot, '.idx', 'mcp.json');
@@ -73,7 +73,7 @@ Authorization = "Bearer TOKEN123"
     const { projectRoot } = testProject;
 
     // Run ruler apply for Copilot agent (supports both stdio and remote)
-    runRuler('apply --agents copilot', projectRoot);
+    runRuler('apply copilot', projectRoot);
 
     // Check the generated config
     const configPath = path.join(projectRoot, '.vscode', 'mcp.json');

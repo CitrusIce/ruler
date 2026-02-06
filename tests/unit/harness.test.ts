@@ -119,14 +119,14 @@ describe('Test Harness', () => {
     });
 
     it('executes ruler commands and returns output', async () => {
-      const output = runRuler('apply', testProject.projectRoot);
+      const output = runRuler('apply claude', testProject.projectRoot);
       
       expect(output).toBeDefined();
       expect(typeof output).toBe('string');
     });
 
     it('works with command arguments', async () => {
-      const output = runRuler('apply --agents copilot', testProject.projectRoot);
+      const output = runRuler('apply copilot', testProject.projectRoot);
       
       expect(output).toBeDefined();
       expect(typeof output).toBe('string');

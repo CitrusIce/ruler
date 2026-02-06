@@ -20,7 +20,7 @@ describe('CLI legacy mcp.json warning', () => {
 
   it('prints warning', async () => {
     const { projectRoot } = testProject;
-  const output = runRulerAll('apply', projectRoot);
+    const output = runRulerAll('apply copilot', projectRoot);
     expect(output).toContain(warningText);
   });
 });

@@ -22,7 +22,7 @@ describe('mcp-empty-server-key-fix', () => {
     const { projectRoot } = testProject;
     
     // Apply to Goose agent which returns empty string from getMcpServerKey()
-    runRulerWithInheritedStdio('apply --agents goose', projectRoot);
+    runRulerWithInheritedStdio('apply goose', projectRoot);
 
     // Goose doesn't actually create MCP files (it doesn't support MCP), 
     // but let's verify it doesn't break or create invalid configs
@@ -44,7 +44,7 @@ describe('mcp-empty-server-key-fix', () => {
       JSON.stringify(claudeNative, null, 2) + '\n'
     );
     
-    runRulerWithInheritedStdio('apply --agents claude', projectRoot);
+    runRulerWithInheritedStdio('apply claude', projectRoot);
 
     // Verify Claude MCP config uses 'mcpServers' key, not empty string
     const claudeResultText = await fs.readFile(
@@ -80,7 +80,9 @@ describe('mcp-empty-server-key-fix', () => {
     );
     
     // Apply to multiple agents including Goose (which returns empty string) and Claude
-    runRulerWithInheritedStdio('apply --agents claude,cursor,goose', projectRoot);
+    runRulerWithInheritedStdio('apply claude', projectRoot);
+    runRulerWithInheritedStdio('apply cursor', projectRoot);
+    runRulerWithInheritedStdio('apply goose', projectRoot);
 
     // Verify Claude MCP config is correct
     const claudeResultText = await fs.readFile(
