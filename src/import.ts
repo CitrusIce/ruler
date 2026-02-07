@@ -360,6 +360,7 @@ async function importModels(
 ): Promise<ModelsConfig | null> {
   const models: ModelsConfig = {};
   const providers: Record<string, UnifiedProviderConfig> = {};
+  let nextProviderId = 1;
 
   const inferProviderType = (
     name: string,
@@ -372,30 +373,63 @@ async function importModels(
     return undefined;
   };
 
-  const ensureProvider = (
-    name: string,
+  const findMergeableProviderId = (
     type?: ProviderType,
     baseUrl?: string,
     apiKey?: string,
-  ): UnifiedProviderConfig => {
-    const current = providers[name] ?? {};
-    providers[name] = {
-      ...current,
-      type: current.type ?? type,
-      base_url: current.base_url ?? baseUrl,
-      api_key: current.api_key ?? apiKey,
-      models: current.models ?? {},
+  ): string | undefined => {
+    if (!apiKey) return undefined;
+    for (const [id, cfg] of Object.entries(providers)) {
+      if (cfg.api_key !== apiKey) continue;
+      if (type && cfg.type && cfg.type !== type) continue;
+      if (baseUrl && cfg.base_url && cfg.base_url !== baseUrl) continue;
+      return id;
+    }
+    return undefined;
+  };
+
+  const createProvider = (
+    type?: ProviderType,
+    baseUrl?: string,
+    apiKey?: string,
+  ): string => {
+    const mergeableId = findMergeableProviderId(type, baseUrl, apiKey);
+    if (mergeableId) {
+      const existing = providers[mergeableId];
+      if (existing) {
+        if (!existing.type && type) existing.type = type;
+        if (!existing.base_url && baseUrl) existing.base_url = baseUrl;
+        if (!existing.api_key && apiKey) existing.api_key = apiKey;
+        existing.models = existing.models ?? {};
+      }
+      return mergeableId;
+    }
+
+    const id = String(nextProviderId++);
+    providers[id] = {
+      type,
+      base_url: baseUrl,
+      api_key: apiKey,
+      models: {},
     };
-    return providers[name];
+    return id;
+  };
+
+  const setProviderApi = (providerId: string, apiKey?: string): void => {
+    if (!apiKey) return;
+    const current = providers[providerId];
+    if (!current) return;
+    if (!current.api_key) current.api_key = apiKey;
   };
 
   const addProviderModel = (
-    providerName: string,
+    providerId: string,
     modelId: string,
     displayName?: string,
   ): void => {
     if (!modelId) return;
-    const p = providers[providerName] ?? ensureProvider(providerName);
+    const p = providers[providerId];
+    if (!p) return;
     p.models = p.models ?? {};
     p.models[modelId] = {
       ...(p.models[modelId] ?? {}),
@@ -432,8 +466,8 @@ async function importModels(
         typeof settings.model === 'string'
           ? (settings.model as string)
           : undefined;
-      ensureProvider('anthropic', 'anthropic', baseUrl, authVal);
-      if (claudeModel) addProviderModel('anthropic', claudeModel);
+      const anthropicId = createProvider('anthropic', baseUrl, authVal);
+      if (claudeModel) addProviderModel(anthropicId, claudeModel);
     }
   }
 
@@ -469,6 +503,7 @@ async function importModels(
         !Array.isArray(cfg.model_providers)
           ? (cfg.model_providers as Record<string, unknown>)
           : {};
+      const codexProviderIds: Record<string, string> = {};
       for (const [name, def] of Object.entries(providersRaw)) {
         if (!def || typeof def !== 'object' || Array.isArray(def)) continue;
         const d = def as Record<string, unknown>;
@@ -476,17 +511,22 @@ async function importModels(
           typeof d.name === 'string' ? (d.name as string) : undefined;
         const providerBaseUrl =
           typeof d.base_url === 'string' ? (d.base_url as string) : undefined;
-        ensureProvider(
-          name,
+        const providerId = createProvider(
           inferProviderType(name, providerName),
           providerBaseUrl,
           undefined,
         );
+        codexProviderIds[name] = providerId;
       }
 
       const codexProviderName = model_provider || 'openai';
-      ensureProvider(codexProviderName, 'openai', undefined, openaiKey);
-      if (model) addProviderModel(codexProviderName, model);
+      let selectedProviderId = codexProviderIds[codexProviderName];
+      if (!selectedProviderId) {
+        selectedProviderId = createProvider('openai', undefined, undefined);
+        codexProviderIds[codexProviderName] = selectedProviderId;
+      }
+      setProviderApi(selectedProviderId, openaiKey);
+      if (model) addProviderModel(selectedProviderId, model);
     }
   }
 
@@ -494,6 +534,7 @@ async function importModels(
     const userPath = path.join(src.xdgConfigHome, 'opencode', 'opencode.jsonc');
     const userJson = await readJsoncIfExists(userPath);
     if (userJson) {
+      const opencodeProviderIds: Record<string, string> = {};
       const provider =
         userJson.provider &&
         typeof userJson.provider === 'object' &&
@@ -519,8 +560,7 @@ async function importModels(
             ? (options.apiKey as string)
             : undefined;
 
-        ensureProvider(
-          provName,
+        const providerId = createProvider(
           inferProviderType(
             provName,
             typeof d.npm === 'string' ? d.npm : undefined,
@@ -528,6 +568,7 @@ async function importModels(
           baseURL,
           apiKey,
         );
+        opencodeProviderIds[provName] = providerId;
 
         const modelsRaw =
           d.models && typeof d.models === 'object' && !Array.isArray(d.models)
@@ -537,7 +578,7 @@ async function importModels(
           if (!m || typeof m !== 'object' || Array.isArray(m)) continue;
           const mm = m as Record<string, unknown>;
           addProviderModel(
-            provName,
+            providerId,
             id,
             typeof mm.name === 'string' ? (mm.name as string) : undefined,
           );
@@ -550,8 +591,12 @@ async function importModels(
           : undefined;
       if (opencodeModel && opencodeModel.includes('/')) {
         const [providerName, modelId] = opencodeModel.split('/', 2);
-        ensureProvider(providerName, inferProviderType(providerName));
-        addProviderModel(providerName, modelId);
+        let providerId = opencodeProviderIds[providerName];
+        if (!providerId) {
+          providerId = createProvider(inferProviderType(providerName));
+          opencodeProviderIds[providerName] = providerId;
+        }
+        addProviderModel(providerId, modelId);
       }
       const opencodeSmall =
         typeof userJson.small_model === 'string'
@@ -559,8 +604,12 @@ async function importModels(
           : undefined;
       if (opencodeSmall && opencodeSmall.includes('/')) {
         const [providerName, modelId] = opencodeSmall.split('/', 2);
-        ensureProvider(providerName, inferProviderType(providerName));
-        addProviderModel(providerName, modelId);
+        let providerId = opencodeProviderIds[providerName];
+        if (!providerId) {
+          providerId = createProvider(inferProviderType(providerName));
+          opencodeProviderIds[providerName] = providerId;
+        }
+        addProviderModel(providerId, modelId);
       }
     }
   }
