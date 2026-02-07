@@ -394,15 +394,17 @@ export async function initHandler(argv: InitArgs): Promise<void> {
   if (!(await exists(instructionsPath))) {
     // Create new AGENTS.md regardless of legacy presence.
     await fs.writeFile(instructionsPath, DEFAULT_INSTRUCTIONS);
-    console.log(`[ruler] Created ${instructionsPath}`);
+    console.log(`[ruler-plus] Created ${instructionsPath}`);
   } else {
-    console.log(`[ruler] ${DEFAULT_RULES_FILENAME} already exists, skipping`);
+    console.log(
+      `[ruler-plus] ${DEFAULT_RULES_FILENAME} already exists, skipping`,
+    );
   }
   if (!(await exists(tomlPath))) {
     await fs.writeFile(tomlPath, DEFAULT_TOML);
-    console.log(`[ruler] Created ${tomlPath}`);
+    console.log(`[ruler-plus] Created ${tomlPath}`);
   } else {
-    console.log(`[ruler] ruler.toml already exists, skipping`);
+    console.log(`[ruler-plus] ruler.toml already exists, skipping`);
   }
 }
 

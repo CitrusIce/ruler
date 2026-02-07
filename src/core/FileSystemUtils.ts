@@ -48,7 +48,7 @@ export async function findRulerDir(
       }
     } catch (err) {
       console.error(
-        `[ruler] Error checking global config directory ${globalConfigDir}:`,
+        `[ruler-plus] Error checking global config directory ${globalConfigDir}:`,
         err,
       );
     }

@@ -12,7 +12,7 @@ export function validateMcp(data: unknown): void {
     typeof (data as Record<string, unknown>).mcpServers !== 'object'
   ) {
     throw new Error(
-      '[ruler] Invalid MCP config: must contain an object property "mcpServers" (Ruler style)',
+      '[ruler-plus] Invalid MCP config: must contain an object property "mcpServers" (Ruler style)',
     );
   }
 }

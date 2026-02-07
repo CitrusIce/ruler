@@ -30,6 +30,17 @@
 > - Please test this version carefully in your environment
 > - Report issues at https://github.com/intellectronica/ruler/issues
 
+## What's Different in `ruler-plus`
+
+Compared to upstream Ruler, this fork adds and changes:
+
+- **Binary name**: use `ruler-plus` (not `ruler`).
+- **Per-agent apply commands**: `ruler-plus apply <agent>` (e.g. `claude`, `codex`, `opencode`) instead of a single multi-agent apply flag flow.
+- **Import workflow**: `ruler-plus import` can reverse-generate `.ruler/` from existing native configs.
+- **User-scope output controls**: `--output-scope project|user|both` for MCP/skills/rules/model writes.
+- **Unified model layout**: model providers are stored under `models.providers.<id>.models.<model_id>`.
+- **Provider merge rule on import**: providers merge when `base_url` + `api_key` match; otherwise they are kept separate.
+
 ## Why Ruler?
 
 Managing instructions across multiple AI coding tools becomes complex as your team grows. Different agents (GitHub Copilot, Claude, Cursor, Aider, etc.) require their own configuration files, leading to:
@@ -90,6 +101,27 @@ Ruler solves this by providing a **single source of truth** for all your AI agen
 | JetBrains AI Assistant | `.aiassistant/rules/AGENTS.md`           | -                                                | -                         |
 
 ## Getting Started
+
+### Quick Start (`ruler-plus`)
+
+```bash
+# 1) Initialize config in current project
+ruler-plus init
+
+# 2) Import existing Claude/Codex/OpenCode configs into .ruler/
+ruler-plus import --agents claude,codex,opencode
+
+# 3) Apply to a specific agent
+ruler-plus apply claude
+ruler-plus apply codex
+ruler-plus apply opencode
+```
+
+Optional scope control:
+
+```bash
+ruler-plus apply claude --output-scope user
+```
 
 ### Installation
 
@@ -297,6 +329,8 @@ The `import` command reverse-generates a new `.ruler/` directory from existing a
 Notes:
 - Supports importing MCP + skills + rules for: Claude Code (`claude`), OpenAI Codex CLI (`codex`), and OpenCode (`opencode`).
 - Refuses to run if `.ruler/` already exists in the project.
+- Imported model providers are written under `models.providers.<id>` where `<id>` is an auto-incrementing numeric ID.
+- Provider merge rule during import: if `base_url` and `api_key` are identical, entries are merged into one provider ID; otherwise they remain separate providers.
 
 ```bash
 ruler-plus import --agents claude,codex,opencode

@@ -195,11 +195,14 @@ export async function loadConfig(
     }
   } catch (err) {
     if (err instanceof Error && (err as ErrnoException).code !== 'ENOENT') {
-      if (err.message.includes('[ruler]')) {
+      if (
+        err.message.includes('[ruler-plus]') ||
+        err.message.includes('[ruler]')
+      ) {
         throw err; // Re-throw validation errors
       }
       console.warn(
-        `[ruler] Warning: could not read config file at ${configFile}: ${err.message}`,
+        `[ruler-plus] Warning: could not read config file at ${configFile}: ${err.message}`,
       );
     }
     raw = {};
