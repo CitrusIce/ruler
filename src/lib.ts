@@ -76,16 +76,10 @@ export async function applyAllAgentConfigs(
   const applyModelsOverride = (cfg: LoadedConfig): void => {
     if (!modelsOverride) return;
     const merged: ModelsConfig = { ...(cfg.models ?? {}) };
-    if (modelsOverride.claude) {
-      merged.claude = { ...(merged.claude ?? {}), ...modelsOverride.claude };
-    }
-    if (modelsOverride.codex) {
-      merged.codex = { ...(merged.codex ?? {}), ...modelsOverride.codex };
-    }
-    if (modelsOverride.opencode) {
-      merged.opencode = {
-        ...(merged.opencode ?? {}),
-        ...modelsOverride.opencode,
+    if (modelsOverride.providers) {
+      merged.providers = {
+        ...(merged.providers ?? {}),
+        ...modelsOverride.providers,
       };
     }
     cfg.models = merged;

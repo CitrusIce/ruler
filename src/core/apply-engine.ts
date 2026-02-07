@@ -568,13 +568,48 @@ async function handleModelConfiguration(
   const models = config.models;
   if (!models) return;
 
+  const unifiedProviders = models.providers ?? {};
+  const getFirstProviderByType = (
+    type: 'anthropic' | 'google' | 'openai',
+  ): {
+    name: string;
+    cfg: NonNullable<(typeof unifiedProviders)[string]>;
+  } | null => {
+    for (const [name, cfg] of Object.entries(unifiedProviders)) {
+      if (cfg?.type === type) return { name, cfg };
+    }
+    return null;
+  };
+  const getFirstEnabledModelId = (providerName: string): string | undefined => {
+    const provider = unifiedProviders[providerName];
+    const modelMap = provider?.models;
+    if (!modelMap) return undefined;
+    for (const [id, def] of Object.entries(modelMap)) {
+      if ((def?.enabled ?? true) !== false) return id;
+    }
+    return undefined;
+  };
+
   const allowUserWrites = outputScope === 'user' || outputScope === 'both';
   const allowProjectWrites =
     outputScope === 'project' || outputScope === 'both';
 
   // Claude Code model settings are user-scoped.
   if (agent.getIdentifier() === 'claude') {
-    if (!allowUserWrites || !models.claude) return;
+    if (!allowUserWrites) return;
+
+    const anthropicProvider = getFirstProviderByType('anthropic');
+    const claudeModel = anthropicProvider
+      ? getFirstEnabledModelId(anthropicProvider.name)
+      : undefined;
+    const claudeBaseUrl = anthropicProvider?.cfg.base_url;
+    const claudeAuthValue = anthropicProvider?.cfg.api_key;
+    const claudeAuthEnvKey = claudeAuthValue
+      ? 'ANTHROPIC_AUTH_TOKEN'
+      : undefined;
+
+    if (!claudeModel && !claudeBaseUrl && !claudeAuthValue) return;
+
     const settingsPath = getUserClaudeSettingsPath();
     if (dryRun) {
       logVerbose(
@@ -593,7 +628,7 @@ async function handleModelConfiguration(
     }
 
     const next = { ...existing } as Record<string, unknown>;
-    if (models.claude.model) next.model = models.claude.model;
+    if (claudeModel) next.model = claudeModel;
 
     const env =
       next.env && typeof next.env === 'object' && !Array.isArray(next.env)
@@ -602,19 +637,19 @@ async function handleModelConfiguration(
             unknown
           >)
         : {};
-    if (models.claude.base_url) {
-      env.ANTHROPIC_BASE_URL = models.claude.base_url;
+    if (claudeBaseUrl) {
+      env.ANTHROPIC_BASE_URL = claudeBaseUrl;
     }
-    if (models.claude.auth_env_key && models.claude.auth_value) {
+    if (claudeAuthEnvKey && claudeAuthValue) {
       const resolved = await resolvePlaceholderString(
-        models.claude.auth_value,
+        claudeAuthValue,
         projectRoot,
       );
       if (resolved) {
-        env[models.claude.auth_env_key] = resolved;
+        env[claudeAuthEnvKey] = resolved;
       } else {
         logWarn(
-          `Skipping Claude auth token update: could not resolve ${models.claude.auth_value}`,
+          `Skipping Claude auth token update: could not resolve ${claudeAuthValue}`,
           dryRun,
         );
       }
@@ -634,7 +669,27 @@ async function handleModelConfiguration(
   }
 
   if (agent.getIdentifier() === 'codex') {
-    if (!models.codex) return;
+    const openaiProvider = getFirstProviderByType('openai');
+    const codexProviderName = openaiProvider?.name ?? 'openai';
+    const codexModel = getFirstEnabledModelId(codexProviderName);
+    const codexApiKey =
+      unifiedProviders[codexProviderName]?.api_key ??
+      openaiProvider?.cfg.api_key;
+
+    const codexProviders = Object.fromEntries(
+      Object.entries(unifiedProviders)
+        .filter(([, providerCfg]) => providerCfg?.type === 'openai')
+        .map(([name, providerCfg]) => [
+          name,
+          {
+            name,
+            base_url: providerCfg.base_url,
+          },
+        ]),
+    );
+
+    if (!codexModel && !codexApiKey && Object.keys(codexProviders).length === 0)
+      return;
 
     // model_provider/model can be project- or user-scoped, but Codex auth.json is user-scoped.
     if (allowProjectWrites) {
@@ -654,13 +709,18 @@ async function handleModelConfiguration(
         }
 
         const next = { ...existingToml } as Record<string, unknown>;
-        if (models.codex.model_provider)
-          next.model_provider = models.codex.model_provider;
-        if (models.codex.model) next.model = models.codex.model;
-        if (models.codex.providers) {
+        if (codexProviderName) next.model_provider = codexProviderName;
+        if (codexModel) next.model = codexModel;
+        if (Object.keys(codexProviders).length > 0) {
+          const existingModelProviders =
+            next.model_providers &&
+            typeof next.model_providers === 'object' &&
+            !Array.isArray(next.model_providers)
+              ? (next.model_providers as Record<string, unknown>)
+              : {};
           next.model_providers = {
-            ...(next.model_providers as any),
-            ...models.codex.providers,
+            ...existingModelProviders,
+            ...codexProviders,
           };
         }
 
@@ -676,18 +736,18 @@ async function handleModelConfiguration(
       }
     }
 
-    if (allowUserWrites && models.codex.openai_api_key) {
+    if (allowUserWrites && codexApiKey) {
       const authPath = getUserCodexAuthPath();
       if (dryRun) {
         logVerbose(`DRY RUN: Would apply Codex auth to: ${authPath}`, verbose);
       } else {
         const resolved = await resolvePlaceholderString(
-          models.codex.openai_api_key,
+          codexApiKey,
           projectRoot,
         );
         if (!resolved) {
           logWarn(
-            `Skipping Codex OPENAI_API_KEY update: could not resolve ${models.codex.openai_api_key}`,
+            `Skipping Codex OPENAI_API_KEY update: could not resolve ${codexApiKey}`,
             dryRun,
           );
           return;
@@ -714,8 +774,56 @@ async function handleModelConfiguration(
   }
 
   if (agent.getIdentifier() === 'opencode') {
-    const opencode = models.opencode;
-    if (!opencode) return;
+    const opencodeModel = (() => {
+      for (const [providerName, providerCfg] of Object.entries(
+        unifiedProviders,
+      )) {
+        const modelId = getFirstEnabledModelId(providerName);
+        if (modelId) return `${providerName}/${modelId}`;
+        if (providerCfg?.models && Object.keys(providerCfg.models).length > 0) {
+          const firstId = Object.keys(providerCfg.models)[0];
+          if (firstId) return `${providerName}/${firstId}`;
+        }
+      }
+      return undefined;
+    })();
+
+    const opencodeSmallModel = (() => {
+      if (!opencodeModel) return undefined;
+      for (const [providerName, providerCfg] of Object.entries(
+        unifiedProviders,
+      )) {
+        if (!providerCfg?.models) continue;
+        for (const [modelId, modelCfg] of Object.entries(providerCfg.models)) {
+          if ((modelCfg?.enabled ?? true) === false) continue;
+          const full = `${providerName}/${modelId}`;
+          if (full !== opencodeModel) return full;
+        }
+      }
+      return undefined;
+    })();
+
+    const opencodeProviders = Object.fromEntries(
+      Object.entries(unifiedProviders).map(([providerName, providerCfg]) => [
+        providerName,
+        {
+          base_url: providerCfg.base_url,
+          api_key: providerCfg.api_key,
+          models: providerCfg.models
+            ? Object.fromEntries(
+                Object.entries(providerCfg.models).map(
+                  ([modelId, modelCfg]) => [
+                    modelId,
+                    modelCfg?.display_name ?? modelId,
+                  ],
+                ),
+              )
+            : undefined,
+        },
+      ]),
+    );
+
+    if (!opencodeModel && Object.keys(opencodeProviders).length === 0) return;
 
     const applyToJsonFile = async (destPath: string): Promise<void> => {
       let rawText: string | null = null;
@@ -740,10 +848,10 @@ async function handleModelConfiguration(
       }
 
       const next = { ...existing } as Record<string, unknown>;
-      if (opencode.model) next.model = opencode.model;
-      if (opencode.small_model) next.small_model = opencode.small_model;
+      if (opencodeModel) next.model = opencodeModel;
+      if (opencodeSmallModel) next.small_model = opencodeSmallModel;
 
-      if (opencode.providers) {
+      if (Object.keys(opencodeProviders).length > 0) {
         const existingProviders =
           next.provider &&
           typeof next.provider === 'object' &&
@@ -754,7 +862,7 @@ async function handleModelConfiguration(
               >)
             : {};
 
-        for (const [provName, provCfg] of Object.entries(opencode.providers)) {
+        for (const [provName, provCfg] of Object.entries(opencodeProviders)) {
           const current =
             existingProviders[provName] &&
             typeof existingProviders[provName] === 'object' &&
@@ -763,9 +871,6 @@ async function handleModelConfiguration(
                   ...(existingProviders[provName] as Record<string, unknown>),
                 } as Record<string, unknown>)
               : {};
-
-          if (provCfg.npm) current.npm = provCfg.npm;
-          if (provCfg.name) current.name = provCfg.name;
 
           const options =
             current.options &&

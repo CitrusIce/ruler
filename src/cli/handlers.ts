@@ -166,17 +166,27 @@ export async function applyGenericHandler(
 
 export async function applyClaudeHandler(argv: ApplyClaudeArgs): Promise<void> {
   try {
+    const providerModels: Record<
+      string,
+      { display_name?: string; enabled?: boolean }
+    > = {};
+    if (argv.model) providerModels[argv.model] = { enabled: true };
+
     const modelsOverride: ModelsConfig = {
-      claude: {
-        model: argv.model,
-        base_url: argv['base-url'],
-        auth_env_key: argv['auth-token']
-          ? 'ANTHROPIC_AUTH_TOKEN'
-          : argv['api-key']
-            ? 'ANTHROPIC_API_KEY'
-            : undefined,
-        auth_value: argv['auth-token'] ?? argv['api-key'],
-      },
+      providers:
+        argv.model || argv['base-url'] || argv['auth-token'] || argv['api-key']
+          ? {
+              anthropic: {
+                type: 'anthropic',
+                base_url: argv['base-url'],
+                api_key: argv['auth-token'] ?? argv['api-key'],
+                models:
+                  Object.keys(providerModels).length > 0
+                    ? providerModels
+                    : undefined,
+              },
+            }
+          : undefined,
     };
 
     // Avoid overriding from CLI when no model-related flags are set.
@@ -201,12 +211,27 @@ export async function applyClaudeHandler(argv: ApplyClaudeArgs): Promise<void> {
 
 export async function applyCodexHandler(argv: ApplyCodexArgs): Promise<void> {
   try {
+    const providerName = argv['model-provider'] || 'openai';
+    const providerModels: Record<
+      string,
+      { display_name?: string; enabled?: boolean }
+    > = {};
+    if (argv.model) providerModels[argv.model] = { enabled: true };
+
     const modelsOverride: ModelsConfig = {
-      codex: {
-        model_provider: argv['model-provider'],
-        model: argv.model,
-        openai_api_key: argv['openai-api-key'],
-      },
+      providers:
+        !!argv.model || !!argv['model-provider'] || !!argv['openai-api-key']
+          ? {
+              [providerName]: {
+                type: 'openai',
+                api_key: argv['openai-api-key'],
+                models:
+                  Object.keys(providerModels).length > 0
+                    ? providerModels
+                    : undefined,
+              },
+            }
+          : undefined,
     };
     const hasOverride =
       !!argv.model || !!argv['model-provider'] || !!argv['openai-api-key'];
@@ -228,11 +253,37 @@ export async function applyOpenCodeHandler(
   argv: ApplyOpenCodeArgs,
 ): Promise<void> {
   try {
+    const nestedProviders: ModelsConfig['providers'] = {};
+    if (argv.model && argv.model.includes('/')) {
+      const [providerName, modelId] = argv.model.split('/', 2);
+      nestedProviders[providerName] = {
+        ...(nestedProviders[providerName] ?? {}),
+        models: {
+          ...((nestedProviders[providerName]?.models as Record<
+            string,
+            { display_name?: string; enabled?: boolean }
+          >) ?? {}),
+          [modelId]: { enabled: true },
+        },
+      };
+    }
+    if (argv['small-model'] && argv['small-model'].includes('/')) {
+      const [providerName, modelId] = argv['small-model'].split('/', 2);
+      nestedProviders[providerName] = {
+        ...(nestedProviders[providerName] ?? {}),
+        models: {
+          ...((nestedProviders[providerName]?.models as Record<
+            string,
+            { display_name?: string; enabled?: boolean }
+          >) ?? {}),
+          [modelId]: { enabled: true },
+        },
+      };
+    }
+
     const modelsOverride: ModelsConfig = {
-      opencode: {
-        model: argv.model,
-        small_model: argv['small-model'],
-      },
+      providers:
+        Object.keys(nestedProviders).length > 0 ? nestedProviders : undefined,
     };
     const hasOverride = !!argv.model || !!argv['small-model'];
 

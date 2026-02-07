@@ -4,9 +4,9 @@ import { promises as fs } from 'fs';
 import { parse as parseTOML, stringify as stringifyTOML } from '@iarna/toml';
 import type { McpServerDef } from './core/UnifiedConfigTypes';
 import type {
-  CodexModelProviderConfig,
   ModelsConfig,
-  OpenCodeProviderConfig,
+  ProviderType,
+  UnifiedProviderConfig,
 } from './types';
 
 type ImportAgent = 'claude' | 'codex' | 'opencode';
@@ -357,9 +357,52 @@ async function readJsoncIfExists(
 async function importModels(
   agents: ImportAgent[],
   src: ImportSource,
-  rulerDir: string,
 ): Promise<ModelsConfig | null> {
   const models: ModelsConfig = {};
+  const providers: Record<string, UnifiedProviderConfig> = {};
+
+  const inferProviderType = (
+    name: string,
+    npmName?: string,
+  ): ProviderType | undefined => {
+    const hay = `${name} ${npmName ?? ''}`.toLowerCase();
+    if (hay.includes('anthropic')) return 'anthropic';
+    if (hay.includes('google') || hay.includes('gemini')) return 'google';
+    if (hay.includes('openai')) return 'openai';
+    return undefined;
+  };
+
+  const ensureProvider = (
+    name: string,
+    type?: ProviderType,
+    baseUrl?: string,
+    apiKey?: string,
+  ): UnifiedProviderConfig => {
+    const current = providers[name] ?? {};
+    providers[name] = {
+      ...current,
+      type: current.type ?? type,
+      base_url: current.base_url ?? baseUrl,
+      api_key: current.api_key ?? apiKey,
+      models: current.models ?? {},
+    };
+    return providers[name];
+  };
+
+  const addProviderModel = (
+    providerName: string,
+    modelId: string,
+    displayName?: string,
+  ): void => {
+    if (!modelId) return;
+    const p = providers[providerName] ?? ensureProvider(providerName);
+    p.models = p.models ?? {};
+    p.models[modelId] = {
+      ...(p.models[modelId] ?? {}),
+      display_name: displayName,
+      enabled: true,
+    };
+  };
 
   if (agents.includes('claude')) {
     const settingsPath = path.join(src.homeDir, '.claude', 'settings.json');
@@ -383,23 +426,14 @@ async function importModels(
         typeof env.ANTHROPIC_API_KEY === 'string'
           ? (env.ANTHROPIC_API_KEY as string)
           : undefined;
-      const authEnvKey = token
-        ? 'ANTHROPIC_AUTH_TOKEN'
-        : apiKey
-          ? 'ANTHROPIC_API_KEY'
-          : undefined;
       const authVal = token || apiKey;
 
-      models.claude = {
-        model:
-          typeof settings.model === 'string'
-            ? (settings.model as string)
-            : undefined,
-        base_url: baseUrl,
-        auth_env_key: authEnvKey,
-        // Default: inline secrets into ruler.toml.
-        auth_value: authEnvKey ? authVal : undefined,
-      };
+      const claudeModel =
+        typeof settings.model === 'string'
+          ? (settings.model as string)
+          : undefined;
+      ensureProvider('anthropic', 'anthropic', baseUrl, authVal);
+      if (claudeModel) addProviderModel('anthropic', claudeModel);
     }
   }
 
@@ -435,30 +469,24 @@ async function importModels(
         !Array.isArray(cfg.model_providers)
           ? (cfg.model_providers as Record<string, unknown>)
           : {};
-      const providers: Record<string, CodexModelProviderConfig> = {};
       for (const [name, def] of Object.entries(providersRaw)) {
         if (!def || typeof def !== 'object' || Array.isArray(def)) continue;
         const d = def as Record<string, unknown>;
-        providers[name] = {
-          name: typeof d.name === 'string' ? (d.name as string) : undefined,
-          base_url:
-            typeof d.base_url === 'string' ? (d.base_url as string) : undefined,
-          wire_api:
-            typeof d.wire_api === 'string' ? (d.wire_api as string) : undefined,
-          requires_openai_auth:
-            typeof d.requires_openai_auth === 'boolean'
-              ? (d.requires_openai_auth as boolean)
-              : undefined,
-        };
+        const providerName =
+          typeof d.name === 'string' ? (d.name as string) : undefined;
+        const providerBaseUrl =
+          typeof d.base_url === 'string' ? (d.base_url as string) : undefined;
+        ensureProvider(
+          name,
+          inferProviderType(name, providerName),
+          providerBaseUrl,
+          undefined,
+        );
       }
 
-      models.codex = {
-        model_provider,
-        model,
-        providers: Object.keys(providers).length > 0 ? providers : undefined,
-        // Default: inline secrets into ruler.toml.
-        openai_api_key: openaiKey,
-      };
+      const codexProviderName = model_provider || 'openai';
+      ensureProvider(codexProviderName, 'openai', undefined, openaiKey);
+      if (model) addProviderModel(codexProviderName, model);
     }
   }
 
@@ -466,8 +494,6 @@ async function importModels(
     const userPath = path.join(src.xdgConfigHome, 'opencode', 'opencode.jsonc');
     const userJson = await readJsoncIfExists(userPath);
     if (userJson) {
-      const providers: Record<string, OpenCodeProviderConfig> = {};
-
       const provider =
         userJson.provider &&
         typeof userJson.provider === 'object' &&
@@ -493,39 +519,54 @@ async function importModels(
             ? (options.apiKey as string)
             : undefined;
 
+        ensureProvider(
+          provName,
+          inferProviderType(
+            provName,
+            typeof d.npm === 'string' ? d.npm : undefined,
+          ),
+          baseURL,
+          apiKey,
+        );
+
         const modelsRaw =
           d.models && typeof d.models === 'object' && !Array.isArray(d.models)
             ? (d.models as Record<string, unknown>)
             : {};
-        const modelMap: Record<string, string> = {};
         for (const [id, m] of Object.entries(modelsRaw)) {
           if (!m || typeof m !== 'object' || Array.isArray(m)) continue;
           const mm = m as Record<string, unknown>;
-          if (typeof mm.name === 'string') modelMap[id] = mm.name;
+          addProviderModel(
+            provName,
+            id,
+            typeof mm.name === 'string' ? (mm.name as string) : undefined,
+          );
         }
-
-        providers[provName] = {
-          npm: typeof d.npm === 'string' ? (d.npm as string) : undefined,
-          name: typeof d.name === 'string' ? (d.name as string) : undefined,
-          base_url: baseURL,
-          // Default: inline secrets into ruler.toml.
-          api_key: apiKey,
-          models: Object.keys(modelMap).length > 0 ? modelMap : undefined,
-        };
       }
 
-      models.opencode = {
-        model:
-          typeof userJson.model === 'string'
-            ? (userJson.model as string)
-            : undefined,
-        small_model:
-          typeof userJson.small_model === 'string'
-            ? (userJson.small_model as string)
-            : undefined,
-        providers: Object.keys(providers).length > 0 ? providers : undefined,
-      };
+      const opencodeModel =
+        typeof userJson.model === 'string'
+          ? (userJson.model as string)
+          : undefined;
+      if (opencodeModel && opencodeModel.includes('/')) {
+        const [providerName, modelId] = opencodeModel.split('/', 2);
+        ensureProvider(providerName, inferProviderType(providerName));
+        addProviderModel(providerName, modelId);
+      }
+      const opencodeSmall =
+        typeof userJson.small_model === 'string'
+          ? (userJson.small_model as string)
+          : undefined;
+      if (opencodeSmall && opencodeSmall.includes('/')) {
+        const [providerName, modelId] = opencodeSmall.split('/', 2);
+        ensureProvider(providerName, inferProviderType(providerName));
+        addProviderModel(providerName, modelId);
+      }
     }
+  }
+
+  if (Object.keys(providers).length > 0) {
+    models.providers = providers;
   }
 
   return Object.keys(models).length > 0 ? models : null;
@@ -549,7 +590,7 @@ export async function importToRuler(options: {
 
   await importRules(projectRoot, homeDir, rulerDir);
 
-  const models = await importModels(agents, src, rulerDir);
+  const models = await importModels(agents, src);
 
   const servers = await importMcpServers(agents, src);
   const tomlObj: Record<string, unknown> = {

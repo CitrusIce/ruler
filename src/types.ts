@@ -36,56 +36,22 @@ export interface SkillsConfig {
  * `.ruler/secrets.toml`) to avoid accidental commits.
  */
 export interface ModelsConfig {
-  claude?: ClaudeModelsConfig;
-  codex?: CodexModelsConfig;
-  opencode?: OpenCodeModelsConfig;
+  /** Unified providers map: providers.<provider>.models.<model_id>. */
+  providers?: Record<string, UnifiedProviderConfig>;
 }
 
-export interface ClaudeModelsConfig {
-  /** Claude Code model name (e.g. claude-sonnet-4-5-...). */
-  model?: string;
-  /** Anthropic compatible base URL. */
-  base_url?: string;
-  /** Which env key should be written into Claude settings. */
-  auth_env_key?: 'ANTHROPIC_AUTH_TOKEN' | 'ANTHROPIC_API_KEY';
-  /** API key/token value or placeholder (e.g. {env:...} or {secret:...}). */
-  auth_value?: string;
-}
+export type ProviderType = 'anthropic' | 'google' | 'openai';
 
-export interface CodexModelsConfig {
-  /** Codex CLI model_provider value. */
-  model_provider?: string;
-  /** Codex CLI model value. */
-  model?: string;
-  /** Codex CLI provider blocks (model_providers.<name>.*). */
-  providers?: Record<string, CodexModelProviderConfig>;
-  /** OpenAI API key for Codex auth.json (or placeholder). */
-  openai_api_key?: string;
-}
-
-export interface CodexModelProviderConfig {
-  name?: string;
-  base_url?: string;
-  wire_api?: string;
-  requires_openai_auth?: boolean;
-}
-
-export interface OpenCodeModelsConfig {
-  /** OpenCode model in provider/model form (e.g. anthropic/claude-2). */
-  model?: string;
-  /** Optional small model for lightweight tasks. */
-  small_model?: string;
-  /** Provider fragments for OpenCode (opencode.jsonc provider.*). */
-  providers?: Record<string, OpenCodeProviderConfig>;
-}
-
-export interface OpenCodeProviderConfig {
-  npm?: string;
-  name?: string;
+export interface UnifiedProviderConfig {
+  type?: ProviderType;
   base_url?: string;
   api_key?: string;
-  /** Model id -> display name. */
-  models?: Record<string, string>;
+  models?: Record<string, UnifiedModelConfig>;
+}
+
+export interface UnifiedModelConfig {
+  display_name?: string;
+  enabled?: boolean;
 }
 
 /** Information about a discovered skill. */
